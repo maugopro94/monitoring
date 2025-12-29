@@ -48,6 +48,9 @@
     .tab.active{color:var(--text);background:rgba(106,166,255,.16);box-shadow:0 0 0 2px rgba(106,166,255,.08) inset}
     .status{font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center}
     .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04)}
+    .pill.ok{border-color:rgba(106,166,255,.4);color:var(--text)}
+    .pill.error{border-color:rgba(255,122,122,.6);color:#ffd5d5;background:rgba(255,122,122,.12)}
+    .pill.loading{opacity:.8}
 
     .content{position:relative;overflow:hidden}
     .view{position:absolute;inset:0;display:none}
@@ -225,12 +228,13 @@
 <script>
 /** CONFIG **/
 const DEMO_MODE = false; // ✅ demandé
-const API_BASE = "./api.php"; // ✅ demandé
+const API_BASE = "api.php"; // ✅ demandé
+const NET_LABEL = DEMO_MODE ? "Mode démo" : "API";
 
 /** State / Helpers **/
 const $ = (id) => document.getElementById(id);
 
-const state = { tab:"mapView", page:1, page_size:25, filters:{} };
+const state = { tab:"mapView", page:1, page_size:25, filters:{}, requestId:0, loading:false };
 
 function setTab(tabId){
   state.tab = tabId;
@@ -245,12 +249,49 @@ function escapeHtml(s){
   }[c]));
 }
 
+function setNetStatus(mode, text){
+  const el = $("netPill");
+  el.classList.remove("ok","error","loading");
+  if (mode) el.classList.add(mode);
+  el.textContent = text;
+}
+
+function setLoading(isLoading){
+  state.loading = isLoading;
+  $("btnSearch").disabled = isLoading;
+  $("btnReset").disabled = isLoading;
+}
+
 function paramsFromFilters(filters){
   const p = new URLSearchParams();
   for (const [k,v] of Object.entries(filters)){
     if (v !== "" && v != null) p.set(k, v);
   }
   return p;
+}
+
+function buildParams(route, params = {}){
+  const p = new URLSearchParams({ route });
+  for (const [k,v] of Object.entries(params)){
+    if (v !== "" && v != null) p.set(k, v);
+  }
+  return p;
+}
+
+function buildParamsWithFilters(route, extra = {}){
+  const p = paramsFromFilters(state.filters);
+  p.set("route", route);
+  for (const [k,v] of Object.entries(extra)){
+    if (v !== "" && v != null) p.set(k, v);
+  }
+  return p;
+}
+
+function readIntInput(id){
+  const raw = $(id).value;
+  if (raw === "") return "";
+  const val = Number.parseInt(raw, 10);
+  return Number.isFinite(val) && val >= 0 ? String(val) : "";
 }
 
 function collectFilters(){
@@ -261,8 +302,8 @@ function collectFilters(){
     famille: $("famille").value.trim(),
     date_from: $("dateFrom").value || "",
     date_to: $("dateTo").value || "",
-    count_min: $("countMin").value || "",
-    count_max: $("countMax").value || ""
+    count_min: readIntInput("countMin"),
+    count_max: readIntInput("countMax")
   };
 }
 
@@ -281,39 +322,43 @@ async function safeFetchJson(url){
   }
 }
 
+async function apiGet(route, params = {}){
+  const p = buildParams(route, params);
+  return safeFetchJson(API_BASE + "?" + p.toString());
+}
+
+async function apiGetWithFilters(route, extra = {}){
+  const p = buildParamsWithFilters(route, extra);
+  return safeFetchJson(API_BASE + "?" + p.toString());
+}
+
 /** Backend calls **/
 async function fetchZones(){
-  const url = API_BASE + "?" + new URLSearchParams({ route:"filters/zones" }).toString();
-  const data = await safeFetchJson(url);
+  const data = await apiGet("filters/zones");
   return data.items || [];
 }
 async function fetchSites(zone=""){
-  const p = new URLSearchParams({ route:"filters/sites" });
-  if (zone) p.set("zone", zone);
-  const data = await safeFetchJson(API_BASE + "?" + p.toString());
+  const params = {};
+  if (zone) params.zone = zone;
+  const data = await apiGet("filters/sites", params);
   return data.items || [];
 }
 async function fetchTable(){
-  const p = paramsFromFilters(state.filters);
-  p.set("route","observations");
-  p.set("page", String(state.page));
-  p.set("page_size", String(state.page_size));
-  return safeFetchJson(API_BASE + "?" + p.toString());
+  return apiGetWithFilters("observations", {
+    page: String(state.page),
+    page_size: String(state.page_size),
+  });
 }
 async function fetchStats(){
-  const p = paramsFromFilters(state.filters);
-  p.set("route","observations/stats");
-  return safeFetchJson(API_BASE + "?" + p.toString());
+  return apiGetWithFilters("observations/stats");
 }
 async function fetchGeo(useBbox=false){
-  const p = paramsFromFilters(state.filters);
-  p.set("route","observations/geo");
-  p.set("limit","20000");
+  const extra = { limit:"20000" };
   if (useBbox && map){
     const b = map.getBounds();
-    p.set("bbox", [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(","));
+    extra.bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(",");
   }
-  return safeFetchJson(API_BASE + "?" + p.toString());
+  return apiGetWithFilters("observations/geo", extra);
 }
 
 /** KPI **/
@@ -331,22 +376,32 @@ function setStatusPills(total){
 function renderTable(data){
   const body = $("tableBody");
   body.innerHTML = "";
-  (data.items || []).forEach(row => {
+  const items = data.items || [];
+  if (!items.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(row.date_obs ?? "")}<div class="small">#${escapeHtml(row.doc_id ?? "")}</div></td>
-      <td>${escapeHtml(row.title ?? "")}</td>
-      <td>${escapeHtml(row.famille ?? "")}</td>
-      <td>${escapeHtml(row.zone ?? "")}</td>
-      <td>${escapeHtml(row.site ?? "")}</td>
-      <td>${escapeHtml(row.effectif ?? "")}</td>
-    `;
+    tr.innerHTML = `<td colspan="6" class="small">Aucun résultat</td>`;
     body.appendChild(tr);
-  });
-  $("pageInfo").textContent = `Page ${data.page} · ${data.page_size}/page · Total ${data.total}`;
-  $("prevPage").disabled = (data.page <= 1);
-  $("nextPage").disabled = (data.page * data.page_size) >= data.total;
-  setStatusPills(data.total || 0);
+  } else {
+    items.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(row.date ?? "")}<div class="small">#${escapeHtml(row.doc_id ?? "")}</div></td>
+        <td>${escapeHtml(row.title ?? "")}</td>
+        <td>${escapeHtml(row.famille ?? "")}</td>
+        <td>${escapeHtml(row.zone ?? "")}</td>
+        <td>${escapeHtml(row.site ?? "")}</td>
+        <td>${escapeHtml(row.effectif ?? "")}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+  const page = data.page ?? state.page;
+  const pageSize = data.page_size ?? state.page_size;
+  const total = data.total ?? 0;
+  $("pageInfo").textContent = `Page ${page} · ${pageSize}/page · Total ${total}`;
+  $("prevPage").disabled = (page <= 1);
+  $("nextPage").disabled = (page * pageSize) >= total;
+  setStatusPills(total);
 }
 
 /** Charts **/
@@ -429,7 +484,7 @@ function addOrUpdateSource(geojson){
         <div class="popupRow">Zone : ${escapeHtml(p.zone ?? "")}</div>
         <div class="popupRow">Site : ${escapeHtml(p.site ?? "")}</div>
         <div class="popupRow">Famille : ${escapeHtml(p.famille ?? "")}</div>
-        <div class="popupRow">Date : ${escapeHtml(p.date_obs ?? "")}</div>
+        <div class="popupRow">Date : ${escapeHtml(p.date ?? "")}</div>
         <div class="popupRow">Effectif : ${escapeHtml(p.effectif ?? "")}</div>
       `;
       popup?.remove();
@@ -451,43 +506,123 @@ function debounce(fn, wait){
 }
 
 async function initMap(){
-  if (!maplibregl.supported()){
+  const hasMapLibre = !!window.maplibregl && typeof window.maplibregl.Map === "function";
+  let canUseMap = false;
+  if (hasMapLibre) {
+    if (typeof window.maplibregl.supported === "function") {
+      canUseMap = window.maplibregl.supported();
+    } else if (typeof window.maplibregl.supported === "boolean") {
+      canUseMap = window.maplibregl.supported;
+    } else {
+      canUseMap = true;
+    }
+  }
+  if (!hasMapLibre || !canUseMap){
     $("tabMap").style.display = "none";
     document.getElementById("map").innerHTML =
-      "<div class='notice'>WebGL est désactivé sur ce navigateur/appareil. Active l’accélération matérielle (edge://gpu) ou utilise Tableau/Statistiques.</div>";
+      "<div class='notice'>MapLibre indisponible ou WebGL desactive sur ce navigateur/appareil. Utilise Tableau/Statistiques.</div>";
     setTab("tableView");
     return;
   }
-
   map = new maplibregl.Map({ container:"map", style:mapStyle, center:[-17.45,14.7], zoom:6.5 });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
 
   map.on("load", async ()=>{
-    const geojson = await fetchGeo(true);
-    addOrUpdateSource(geojson);
+    try {
+      const geojson = await fetchGeo(true);
+      addOrUpdateSource(geojson);
+    } catch (err) {
+      console.error(err);
+      setNetStatus("error", "Erreur carte");
+    }
   });
 
   map.on("moveend", debounce(async ()=>{
     if (state.tab !== "mapView") return;
-    const geojson = await fetchGeo(true);
-    addOrUpdateSource(geojson);
+    try {
+      const geojson = await fetchGeo(true);
+      addOrUpdateSource(geojson);
+    } catch (err) {
+      console.error(err);
+      setNetStatus("error", "Erreur carte");
+    }
   }, 350));
 }
 
 /** Orchestration **/
 async function runSearch(){
+  const requestId = ++state.requestId;
   state.filters = collectFilters();
   state.page = 1;
+  setLoading(true);
+  setNetStatus("loading", "Chargement...");
 
-  const table = await fetchTable();
-  renderTable(table);
+  try {
+    let geoFailed = false;
+    const geoPromise = map ? fetchGeo(true).catch(err => {
+      geoFailed = true;
+      console.error(err);
+      return null;
+    }) : null;
 
-  const stats = await fetchStats();
-  renderCharts(stats);
+    const [tableResult, statsResult] = await Promise.allSettled([fetchTable(), fetchStats()]);
+    if (requestId !== state.requestId) return;
 
-  if (map){
-    const geojson = await fetchGeo(true);
-    addOrUpdateSource(geojson);
+    let hasError = false;
+    if (tableResult.status === "fulfilled") {
+      renderTable(tableResult.value);
+    } else {
+      hasError = true;
+      console.error(tableResult.reason);
+    }
+
+    if (statsResult.status === "fulfilled") {
+      renderCharts(statsResult.value);
+    } else {
+      hasError = true;
+      console.error(statsResult.reason);
+    }
+
+    if (geoPromise) {
+      const geojson = await geoPromise;
+      if (geojson && requestId === state.requestId) {
+        addOrUpdateSource(geojson);
+      }
+    }
+
+    if (geoFailed) {
+      hasError = true;
+    }
+
+    setNetStatus(hasError ? "error" : "ok", hasError ? "Erreur API" : NET_LABEL);
+  } catch (err) {
+    if (requestId !== state.requestId) return;
+    console.error(err);
+    setNetStatus("error", "Erreur API");
+  } finally {
+    if (requestId === state.requestId) {
+      setLoading(false);
+    }
+  }
+}
+
+async function runTablePage(){
+  const requestId = ++state.requestId;
+  setLoading(true);
+  setNetStatus("loading", "Chargement...");
+  try {
+    const table = await fetchTable();
+    if (requestId !== state.requestId) return;
+    renderTable(table);
+    setNetStatus("ok", NET_LABEL);
+  } catch (err) {
+    if (requestId !== state.requestId) return;
+    console.error(err);
+    setNetStatus("error", "Erreur API");
+  } finally {
+    if (requestId === state.requestId) {
+      setLoading(false);
+    }
   }
 }
 
@@ -499,44 +634,54 @@ function resetFilters(){
 
 /** Boot **/
 (async function boot(){
-  $("netPill").textContent = DEMO_MODE ? "Mode démo" : "API";
+  setNetStatus("ok", NET_LABEL);
 
   document.querySelectorAll(".tab").forEach(el => el.addEventListener("click", ()=>setTab(el.dataset.tab)));
-  $("btnSearch").addEventListener("click", ()=>runSearch().catch(console.error));
-  $("btnReset").addEventListener("click", ()=>{ resetFilters(); runSearch().catch(console.error); });
+  $("btnSearch").addEventListener("click", ()=>runSearch());
+  $("btnReset").addEventListener("click", ()=>{ resetFilters(); runSearch(); });
 
-  $("prevPage").addEventListener("click", async ()=>{
+  $("prevPage").addEventListener("click", ()=>{
     state.page = Math.max(1, state.page-1);
-    renderTable(await fetchTable());
+    runTablePage();
   });
-  $("nextPage").addEventListener("click", async ()=>{
+  $("nextPage").addEventListener("click", ()=>{
     state.page = state.page+1;
-    renderTable(await fetchTable());
+    runTablePage();
   });
 
   // Populate filters
-  const zones = await fetchZones();
-  for (const z of zones){
-    const opt = document.createElement("option");
-    opt.value = z; opt.textContent = z;
-    $("zone").appendChild(opt);
-  }
+  try {
+    const zones = await fetchZones();
+    for (const z of zones){
+      const opt = document.createElement("option");
+      opt.value = z; opt.textContent = z;
+      $("zone").appendChild(opt);
+    }
 
-  const sites = await fetchSites("");
-  for (const s of sites){
-    const opt = document.createElement("option");
-    opt.value = s; opt.textContent = s;
-    $("site").appendChild(opt);
+    const sites = await fetchSites("");
+    for (const s of sites){
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      $("site").appendChild(opt);
+    }
+  } catch (err) {
+    console.error(err);
+    setNetStatus("error", "Erreur API");
   }
 
   $("zone").addEventListener("change", async ()=>{
     const z = $("zone").value;
     $("site").innerHTML = "<option value=''>Tous</option>";
-    const sitesZ = await fetchSites(z);
-    for (const s of sitesZ){
-      const opt = document.createElement("option");
-      opt.value = s; opt.textContent = s;
-      $("site").appendChild(opt);
+    try {
+      const sitesZ = await fetchSites(z);
+      for (const s of sitesZ){
+        const opt = document.createElement("option");
+        opt.value = s; opt.textContent = s;
+        $("site").appendChild(opt);
+      }
+    } catch (err) {
+      console.error(err);
+      setNetStatus("error", "Erreur API");
     }
   });
 
