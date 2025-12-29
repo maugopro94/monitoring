@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Monitoring — Recherche + Carte + Stats</title>
+
+  <!-- MapLibre (WebGL) -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#111a33; --panel2:#0f1730;
+      --text:#e8eeff; --muted:#aab6de; --border:rgba(255,255,255,.12);
+      --accent:#6aa6ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    .app{display:grid;grid-template-columns:340px 1fr;height:100vh;overflow:hidden}
+    .sidebar{background:linear-gradient(180deg,var(--panel),var(--panel2));border-right:1px solid var(--border);padding:16px;overflow:auto}
+    .brand{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+    .dot{width:12px;height:12px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(106,166,255,.6)}
+    .brand h1{font-size:16px;margin:0}
+    .brand p{margin:0;color:var(--muted);font-size:12px}
+    .card{border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,.03)}
+    .card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:700}
+    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);outline:none}
+    input::placeholder{color:rgba(232,238,255,.45)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btns{display:flex;gap:10px;margin-top:12px}
+    button{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(106,166,255,.14);color:var(--text);cursor:pointer;font-weight:700}
+    button.secondary{background:rgba(255,255,255,.06)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .hint{font-size:11px;color:var(--muted);line-height:1.4;margin:10px 0 0}
+    .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .kpi{border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(255,255,255,.03)}
+    .kpi .v{font-size:18px;font-weight:900}
+    .kpi .l{font-size:11px;color:var(--muted);margin-top:2px}
+
+    .main{display:grid;grid-template-rows:58px 1fr;overflow:hidden}
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+    .tabs{display:flex;gap:8px}
+    .tab{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);cursor:pointer;font-weight:800;font-size:13px;color:var(--muted);user-select:none}
+    .tab.active{color:var(--text);background:rgba(106,166,255,.16);box-shadow:0 0 0 2px rgba(106,166,255,.08) inset}
+    .status{font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04)}
+
+    .content{position:relative;overflow:hidden}
+    .view{position:absolute;inset:0;display:none}
+    .view.active{display:block}
+    #map{width:100%;height:100%}
+
+    .tableWrap,.statsWrap{height:100%;overflow:auto;padding:14px}
+    table{width:100%;border-collapse:collapse;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+    th,td{padding:10px;border-bottom:1px solid var(--border);font-size:13px;text-align:left;vertical-align:top}
+    th{color:var(--muted);font-weight:800;background:rgba(255,255,255,.02);position:sticky;top:0}
+    tr:hover td{background:rgba(106,166,255,.06)}
+    .small{font-size:11px;color:var(--muted)}
+    .pagination{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px}
+    .pagination button{flex:unset;padding:8px 10px}
+
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .chartCard{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.03)}
+    .chartCard h3{margin:0 0 10px;font-size:13px;color:var(--muted)}
+    canvas{max-width:100%}
+
+    .maplibregl-popup-content{
+      background:rgba(17,26,51,.95);color:var(--text);border:1px solid var(--border);
+      border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.35);padding:10px;font-family:inherit
+    }
+    .maplibregl-popup-close-button{color:var(--muted)}
+    .popupTitle{font-weight:900;margin-bottom:4px}
+    .popupRow{font-size:12px;color:var(--muted);margin:2px 0}
+    .notice{padding:14px}
+    .notice b{color:var(--text)}
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <h1>Explorer les observations</h1>
+        <p>Backend WAMP (PHP) · MapLibre (si WebGL actif)</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Filtres</h2>
+
+      <label>Recherche texte</label>
+      <input id="q" placeholder="Espèce, site, zone, famille, code..." />
+
+      <label>Zone</label>
+      <select id="zone">
+        <option value="">Toutes</option>
+      </select>
+
+      <label>Site</label>
+      <select id="site">
+        <option value="">Tous</option>
+      </select>
+
+      <label>Famille</label>
+      <input id="famille" placeholder="Ex: Ardeidae" />
+
+      <div class="row">
+        <div>
+          <label>Date début</label>
+          <input id="dateFrom" type="date"/>
+        </div>
+        <div>
+          <label>Date fin</label>
+          <input id="dateTo" type="date"/>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Effectif min</label>
+          <input id="countMin" type="number" min="0" placeholder="0"/>
+        </div>
+        <div>
+          <label>Effectif max</label>
+          <input id="countMax" type="number" min="0" placeholder=""/>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="btnSearch">Rechercher</button>
+        <button id="btnReset" class="secondary">Réinitialiser</button>
+      </div>
+
+      <p class="hint">
+        Les requêtes partent vers <b>api.php</b> avec <b>route=...</b>.
+        Si la carte ne marche pas (WebGL désactivé), utilise l’onglet Tableau/Statistiques.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Résumé</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kpiObs">–</div><div class="l">Observations</div></div>
+        <div class="kpi"><div class="v" id="kpiSpecies">–</div><div class="l">Espèces uniques</div></div>
+        <div class="kpi"><div class="v" id="kpiSites">–</div><div class="l">Sites</div></div>
+        <div class="kpi"><div class="v" id="kpiZones">–</div><div class="l">Zones</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="tabs">
+        <div class="tab active" data-tab="mapView" id="tabMap">Carte</div>
+        <div class="tab" data-tab="tableView">Tableau</div>
+        <div class="tab" data-tab="statsView">Statistiques</div>
+      </div>
+      <div class="status">
+        <span class="pill" id="resultPill">0 résultat</span>
+        <span class="pill" id="netPill">API</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="mapView" class="view active">
+        <div id="map"></div>
+      </div>
+
+      <div id="tableView" class="view">
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Espèce / Titre</th>
+                <th>Famille</th>
+                <th>Zone</th>
+                <th>Site</th>
+                <th>Effectif</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+          <div class="pagination">
+            <span class="small" id="pageInfo">Page 1</span>
+            <button id="prevPage" class="secondary">◀</button>
+            <button id="nextPage" class="secondary">▶</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="statsView" class="view">
+        <div class="statsWrap">
+          <div class="grid2">
+            <div class="chartCard">
+              <h3>Observations par mois</h3>
+              <canvas id="chartTime"></canvas>
+            </div>
+            <div class="chartCard">
+              <h3>Top espèces (wiCode)</h3>
+              <canvas id="chartTopSpecies"></canvas>
+            </div>
+            <div class="chartCard">
+              <h3>Top sites</h3>
+              <canvas id="chartTopSites"></canvas>
+            </div>
+            <div class="chartCard">
+              <h3>Répartition par famille</h3>
+              <canvas id="chartFamilies"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+/** CONFIG **/
+const DEMO_MODE = false; // ✅ demandé
+const API_BASE = "./api.php"; // ✅ demandé
+
+/** State / Helpers **/
+const $ = (id) => document.getElementById(id);
+
+const state = { tab:"mapView", page:1, page_size:25, filters:{} };
+
+function setTab(tabId){
+  state.tab = tabId;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabId));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === tabId));
+  if (tabId === "mapView" && map) setTimeout(()=>map.resize(), 50);
+}
+
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+  }[c]));
+}
+
+function paramsFromFilters(filters){
+  const p = new URLSearchParams();
+  for (const [k,v] of Object.entries(filters)){
+    if (v !== "" && v != null) p.set(k, v);
+  }
+  return p;
+}
+
+function collectFilters(){
+  return {
+    q: $("q").value.trim(),
+    zone: $("zone").value,
+    site: $("site").value,
+    famille: $("famille").value.trim(),
+    date_from: $("dateFrom").value || "",
+    date_to: $("dateTo").value || "",
+    count_min: $("countMin").value || "",
+    count_max: $("countMax").value || ""
+  };
+}
+
+async function safeFetchJson(url){
+  const res = await fetch(url);
+  const text = await res.text(); // <- lit le message même en cas d'erreur
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} on ${url}\n\n${text}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Réponse non-JSON sur ${url}\n\n${text}`);
+  }
+}
+
+/** Backend calls **/
+async function fetchZones(){
+  const url = API_BASE + "?" + new URLSearchParams({ route:"filters/zones" }).toString();
+  const data = await safeFetchJson(url);
+  return data.items || [];
+}
+async function fetchSites(zone=""){
+  const p = new URLSearchParams({ route:"filters/sites" });
+  if (zone) p.set("zone", zone);
+  const data = await safeFetchJson(API_BASE + "?" + p.toString());
+  return data.items || [];
+}
+async function fetchTable(){
+  const p = paramsFromFilters(state.filters);
+  p.set("route","observations");
+  p.set("page", String(state.page));
+  p.set("page_size", String(state.page_size));
+  return safeFetchJson(API_BASE + "?" + p.toString());
+}
+async function fetchStats(){
+  const p = paramsFromFilters(state.filters);
+  p.set("route","observations/stats");
+  return safeFetchJson(API_BASE + "?" + p.toString());
+}
+async function fetchGeo(useBbox=false){
+  const p = paramsFromFilters(state.filters);
+  p.set("route","observations/geo");
+  p.set("limit","20000");
+  if (useBbox && map){
+    const b = map.getBounds();
+    p.set("bbox", [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(","));
+  }
+  return safeFetchJson(API_BASE + "?" + p.toString());
+}
+
+/** KPI **/
+function updateKpis(k){
+  $("kpiObs").textContent = k.observations ?? "–";
+  $("kpiSpecies").textContent = k.species ?? "–";
+  $("kpiSites").textContent = k.sites ?? "–";
+  $("kpiZones").textContent = k.zones ?? "–";
+}
+function setStatusPills(total){
+  $("resultPill").textContent = `${total} résultat${total>1?"s":""}`;
+}
+
+/** Table **/
+function renderTable(data){
+  const body = $("tableBody");
+  body.innerHTML = "";
+  (data.items || []).forEach(row => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.date_obs ?? "")}<div class="small">#${escapeHtml(row.doc_id ?? "")}</div></td>
+      <td>${escapeHtml(row.title ?? "")}</td>
+      <td>${escapeHtml(row.famille ?? "")}</td>
+      <td>${escapeHtml(row.zone ?? "")}</td>
+      <td>${escapeHtml(row.site ?? "")}</td>
+      <td>${escapeHtml(row.effectif ?? "")}</td>
+    `;
+    body.appendChild(tr);
+  });
+  $("pageInfo").textContent = `Page ${data.page} · ${data.page_size}/page · Total ${data.total}`;
+  $("prevPage").disabled = (data.page <= 1);
+  $("nextPage").disabled = (data.page * data.page_size) >= data.total;
+  setStatusPills(data.total || 0);
+}
+
+/** Charts **/
+let chartTime, chartTopSpecies, chartTopSites, chartFamilies;
+function renderCharts(stats){
+  updateKpis(stats.kpis || {});
+  const timeLabels = (stats.time || []).map(x => x.label);
+  const timeValues = (stats.time || []).map(x => x.value);
+
+  chartTime?.destroy();
+  chartTime = new Chart($("chartTime"), { type:"line",
+    data:{ labels:timeLabels, datasets:[{ label:"Observations", data:timeValues }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } } }
+  });
+
+  const spLabels = (stats.top_species || []).map(x => x.label);
+  const spValues = (stats.top_species || []).map(x => x.value);
+  chartTopSpecies?.destroy();
+  chartTopSpecies = new Chart($("chartTopSpecies"), { type:"bar",
+    data:{ labels:spLabels, datasets:[{ label:"Occurences", data:spValues }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } } }
+  });
+
+  const siteLabels = (stats.top_sites || []).map(x => x.label);
+  const siteValues = (stats.top_sites || []).map(x => x.value);
+  chartTopSites?.destroy();
+  chartTopSites = new Chart($("chartTopSites"), { type:"bar",
+    data:{ labels:siteLabels, datasets:[{ label:"Observations", data:siteValues }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } } }
+  });
+
+  const famLabels = (stats.families || []).map(x => x.label);
+  const famValues = (stats.families || []).map(x => x.value);
+  chartFamilies?.destroy();
+  chartFamilies = new Chart($("chartFamilies"), { type:"doughnut",
+    data:{ labels:famLabels, datasets:[{ data:famValues }] },
+    options:{ responsive:true, plugins:{ legend:{ position:"bottom" } } }
+  });
+}
+
+/** MapLibre **/
+let map = null;
+let popup = null;
+
+const mapStyle = {
+  version:8,
+  sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap contributors" } },
+  layers:[{ id:"osm", type:"raster", source:"osm" }]
+};
+
+function addOrUpdateSource(geojson){
+  if (!map.getSource("obs")){
+    map.addSource("obs", { type:"geojson", data:geojson, cluster:true, clusterMaxZoom:12, clusterRadius:50 });
+
+    map.addLayer({ id:"clusters", type:"circle", source:"obs", filter:["has","point_count"],
+      paint:{ "circle-radius":["step",["get","point_count"],16,50,22,200,28], "circle-opacity":0.75 }
+    });
+    map.addLayer({ id:"cluster-count", type:"symbol", source:"obs", filter:["has","point_count"],
+      layout:{ "text-field":"{point_count_abbreviated}", "text-size":12 }
+    });
+    map.addLayer({ id:"unclustered-point", type:"circle", source:"obs", filter:["!",["has","point_count"]],
+      paint:{ "circle-radius":6, "circle-opacity":0.9 }
+    });
+
+    map.on("click","clusters",(e)=>{
+      const feats = map.queryRenderedFeatures(e.point,{ layers:["clusters"] });
+      if (!feats.length) return;
+      const clusterId = feats[0].properties.cluster_id;
+      map.getSource("obs").getClusterExpansionZoom(clusterId,(err,zoom)=>{
+        if (err) return;
+        map.easeTo({ center:feats[0].geometry.coordinates, zoom });
+      });
+    });
+
+    map.on("click","unclustered-point",(e)=>{
+      const f = e.features[0];
+      const p = f.properties;
+      const html = `
+        <div class="popupTitle">${escapeHtml(p.title ?? "Observation")}</div>
+        <div class="popupRow">Zone : ${escapeHtml(p.zone ?? "")}</div>
+        <div class="popupRow">Site : ${escapeHtml(p.site ?? "")}</div>
+        <div class="popupRow">Famille : ${escapeHtml(p.famille ?? "")}</div>
+        <div class="popupRow">Date : ${escapeHtml(p.date_obs ?? "")}</div>
+        <div class="popupRow">Effectif : ${escapeHtml(p.effectif ?? "")}</div>
+      `;
+      popup?.remove();
+      popup = new maplibregl.Popup({ closeButton:true }).setLngLat(f.geometry.coordinates).setHTML(html).addTo(map);
+    });
+
+    map.on("mouseenter","clusters",()=>map.getCanvas().style.cursor="pointer");
+    map.on("mouseleave","clusters",()=>map.getCanvas().style.cursor="");
+    map.on("mouseenter","unclustered-point",()=>map.getCanvas().style.cursor="pointer");
+    map.on("mouseleave","unclustered-point",()=>map.getCanvas().style.cursor="");
+  } else {
+    map.getSource("obs").setData(geojson);
+  }
+}
+
+function debounce(fn, wait){
+  let t;
+  return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args),wait); };
+}
+
+async function initMap(){
+  if (!maplibregl.supported()){
+    $("tabMap").style.display = "none";
+    document.getElementById("map").innerHTML =
+      "<div class='notice'>WebGL est désactivé sur ce navigateur/appareil. Active l’accélération matérielle (edge://gpu) ou utilise Tableau/Statistiques.</div>";
+    setTab("tableView");
+    return;
+  }
+
+  map = new maplibregl.Map({ container:"map", style:mapStyle, center:[-17.45,14.7], zoom:6.5 });
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+  map.on("load", async ()=>{
+    const geojson = await fetchGeo(true);
+    addOrUpdateSource(geojson);
+  });
+
+  map.on("moveend", debounce(async ()=>{
+    if (state.tab !== "mapView") return;
+    const geojson = await fetchGeo(true);
+    addOrUpdateSource(geojson);
+  }, 350));
+}
+
+/** Orchestration **/
+async function runSearch(){
+  state.filters = collectFilters();
+  state.page = 1;
+
+  const table = await fetchTable();
+  renderTable(table);
+
+  const stats = await fetchStats();
+  renderCharts(stats);
+
+  if (map){
+    const geojson = await fetchGeo(true);
+    addOrUpdateSource(geojson);
+  }
+}
+
+function resetFilters(){
+  $("q").value=""; $("zone").value=""; $("site").value="";
+  $("famille").value=""; $("dateFrom").value=""; $("dateTo").value="";
+  $("countMin").value=""; $("countMax").value="";
+}
+
+/** Boot **/
+(async function boot(){
+  $("netPill").textContent = DEMO_MODE ? "Mode démo" : "API";
+
+  document.querySelectorAll(".tab").forEach(el => el.addEventListener("click", ()=>setTab(el.dataset.tab)));
+  $("btnSearch").addEventListener("click", ()=>runSearch().catch(console.error));
+  $("btnReset").addEventListener("click", ()=>{ resetFilters(); runSearch().catch(console.error); });
+
+  $("prevPage").addEventListener("click", async ()=>{
+    state.page = Math.max(1, state.page-1);
+    renderTable(await fetchTable());
+  });
+  $("nextPage").addEventListener("click", async ()=>{
+    state.page = state.page+1;
+    renderTable(await fetchTable());
+  });
+
+  // Populate filters
+  const zones = await fetchZones();
+  for (const z of zones){
+    const opt = document.createElement("option");
+    opt.value = z; opt.textContent = z;
+    $("zone").appendChild(opt);
+  }
+
+  const sites = await fetchSites("");
+  for (const s of sites){
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    $("site").appendChild(opt);
+  }
+
+  $("zone").addEventListener("change", async ()=>{
+    const z = $("zone").value;
+    $("site").innerHTML = "<option value=''>Tous</option>";
+    const sitesZ = await fetchSites(z);
+    for (const s of sitesZ){
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      $("site").appendChild(opt);
+    }
+  });
+
+  await initMap();
+
+  await runSearch();
+})();
+</script>
+</body>
+</html>
