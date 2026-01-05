@@ -29,6 +29,8 @@
     .card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:700}
     label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
     input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);outline:none}
+    select{color-scheme:dark}
+    select option{background:var(--panel);color:var(--text)}
     input::placeholder{color:rgba(232,238,255,.45)}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .btns{display:flex;gap:10px;margin-top:12px}
@@ -361,6 +363,10 @@ async function fetchGeo(useBbox=false){
   return apiGetWithFilters("observations/geo", extra);
 }
 
+function shouldUseBboxForGeo(){
+  return !(state.filters && state.filters.site);
+}
+
 /** KPI **/
 function updateKpis(k){
   $("kpiObs").textContent = k.observations ?? "–";
@@ -500,6 +506,28 @@ function addOrUpdateSource(geojson){
   }
 }
 
+function fitMapToGeojson(geojson){
+  if (!map || !geojson || !Array.isArray(geojson.features) || !geojson.features.length) {
+    return;
+  }
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
+  for (const f of geojson.features) {
+    const g = f && f.geometry;
+    if (!g || g.type !== "Point") continue;
+    const coords = Array.isArray(g.coordinates) ? g.coordinates : null;
+    if (!coords || coords.length < 2) continue;
+    const lon = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+    minLon = Math.min(minLon, lon);
+    minLat = Math.min(minLat, lat);
+    maxLon = Math.max(maxLon, lon);
+    maxLat = Math.max(maxLat, lat);
+  }
+  if (!Number.isFinite(minLon)) return;
+  map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding:40, maxZoom:13 });
+}
+
 function debounce(fn, wait){
   let t;
   return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args),wait); };
@@ -524,7 +552,7 @@ async function initMap(){
     setTab("tableView");
     return;
   }
-  map = new maplibregl.Map({ container:"map", style:mapStyle, center:[-17.45,14.7], zoom:6.5 });
+  map = new maplibregl.Map({ container:"map", style:mapStyle, bounds:[[-17.7,12.1],[-11.3,16.9]], fitBoundsOptions:{ padding:20 }, maxBounds:[[-17.7,12.1],[-11.3,16.9]] });
   map.addControl(new maplibregl.NavigationControl(), "top-right");
 
   map.on("load", async ()=>{
@@ -539,6 +567,7 @@ async function initMap(){
 
   map.on("moveend", debounce(async ()=>{
     if (state.tab !== "mapView") return;
+    if (!shouldUseBboxForGeo()) return;
     try {
       const geojson = await fetchGeo(true);
       addOrUpdateSource(geojson);
@@ -559,7 +588,8 @@ async function runSearch(){
 
   try {
     let geoFailed = false;
-    const geoPromise = map ? fetchGeo(true).catch(err => {
+    const useBbox = shouldUseBboxForGeo();
+    const geoPromise = map ? fetchGeo(useBbox).catch(err => {
       geoFailed = true;
       console.error(err);
       return null;
@@ -587,6 +617,9 @@ async function runSearch(){
       const geojson = await geoPromise;
       if (geojson && requestId === state.requestId) {
         addOrUpdateSource(geojson);
+        if (state.filters.site) {
+          fitMapToGeojson(geojson);
+        }
       }
     }
 
@@ -683,6 +716,10 @@ function resetFilters(){
       console.error(err);
       setNetStatus("error", "Erreur API");
     }
+  });
+
+  $("site").addEventListener("change", ()=>{
+    runSearch();
   });
 
   await initMap();

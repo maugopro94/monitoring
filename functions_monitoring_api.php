@@ -142,6 +142,22 @@ function lookup_zone_coords(?string $zone): ?array
 }
 
 /**
+ * Lookup fallback coordinates by site (first) or zone name.
+ *
+ * @param string|null $site
+ * @param string|null $zone
+ * @return array{lat:float,lon:float}|null
+ */
+function lookup_place_coords(?string $site, ?string $zone): ?array
+{
+    $fromSite = lookup_zone_coords($site);
+    if (is_array($fromSite)) {
+        return $fromSite;
+    }
+    return lookup_zone_coords($zone);
+}
+
+/**
  * Check if the search_observations_view exists.
  *
  * @return bool
@@ -605,7 +621,7 @@ function q_geo(array $params): array
         $lon = is_numeric($r['lon']) ? (float)$r['lon'] : null;
         $lat = is_numeric($r['lat']) ? (float)$r['lat'] : null;
         if ($lon === null || $lat === null) {
-            $fallback = lookup_zone_coords($r['zone'] ?? null);
+            $fallback = lookup_place_coords($r['site'] ?? null, $r['zone'] ?? null);
             if (is_array($fallback)) {
                 $lon = $fallback['lon'];
                 $lat = $fallback['lat'];
