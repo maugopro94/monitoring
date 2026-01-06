@@ -1,0 +1,1845 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Charge de suivi - Monitoring</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <style>
+:root{
+  --bg:#f4f7fb; --panel:#ffffff; --panel2:#f8fafc;
+  --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+  --accent:#2f87e2; --accent2:#1f6fb8;
+  --sidebar:#2d3c4d; --sidebar2:#253241;
+  --sidebarText:#e9eef5; --sidebarMuted:#aab4c3;
+  --ok:#2bb673; --warn:#f4a340;
+  --shadow:0 10px 24px rgba(15,23,42,.08);
+  --label:#475569;
+  --field-bg:#f8fafc;
+  --profile-shadow:0 12px 24px rgba(15,23,42,.06);
+  --profile-secondary-bg:#eef2f6;
+  --profile-secondary-border:#d1d9e6;
+  --profile-secondary-text:#000;
+  --profile-secondary-hover:#e2e8f0;
+  --button-light-text:#000;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Manrope",Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+.hidden{display:none !important}
+.app{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
+.sidebar{background:var(--sidebar);border-right:1px solid rgba(255,255,255,.05);padding:16px;overflow:auto;color:var(--sidebarText)}
+.brand{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+.dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(47,135,226,.5)}
+.brand h1{font-size:15px;margin:0;color:var(--sidebarText)}
+.brand p{margin:0;color:var(--sidebarMuted);font-size:12px}
+.nav{display:grid;gap:8px}
+.nav button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--sidebarText);cursor:pointer;font-weight:600}
+.nav button:hover{background:rgba(255,255,255,.06)}
+.nav button.active{background:rgba(47,135,226,.2);border-color:rgba(47,135,226,.3)}
+
+.main{display:grid;grid-template-rows:72px 1fr;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--panel)}
+.titleBlock{display:flex;flex-direction:column;gap:4px}
+.pageTitle{font-size:20px;font-weight:800}
+.pageSubtitle{font-size:12px;color:var(--muted)}
+.userChip{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border)}
+.avatar{width:32px;height:32px;border-radius:999px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+.userName{font-weight:700;font-size:12px}
+.userRole{font-size:11px;color:var(--muted)}
+
+.content{position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:none;overflow:auto;padding:24px}
+.view.active{display:block}
+
+.card{border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--panel);box-shadow:var(--shadow)}
+.card h2{font-size:14px;margin:0 0 12px;color:var(--text);font-weight:800}
+.cardHeader{font-size:14px;font-weight:800;margin-bottom:12px}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
+input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);outline:none}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+select{color-scheme:light dark}
+select option{background:var(--panel);color:var(--text)}
+select{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%),
+    linear-gradient(to right, var(--border), var(--border));
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px),
+    calc(100% - 34px) 50%;
+  background-size:6px 6px,6px 6px,1px 18px;
+  background-repeat:no-repeat;
+  padding-right:38px;
+}
+select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,135,226,.15)}
+textarea{min-height:90px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btns{display:flex;gap:10px;margin-top:12px}
+.btns.end{justify-content:flex-end}
+.btns.end button{flex:unset}
+button{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-weight:700}
+button.secondary{background:#fff;color:var(--button-light-text)}
+button.ghost{background:transparent;color:var(--button-light-text)}
+button:disabled{opacity:.55;cursor:not-allowed}
+.status{font-size:12px;color:var(--muted);margin-top:8px}
+.pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#f3f4f6;font-size:11px}
+.pill.ok{border-color:rgba(43,182,115,.4);color:var(--ok);background:rgba(43,182,115,.12)}
+.pill.warn{border-color:rgba(244,163,64,.4);color:var(--warn);background:rgba(244,163,64,.12)}
+
+.tableWrap{max-height:380px;overflow:auto}
+table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#fff}
+th,td{padding:10px;border-bottom:1px solid var(--border);font-size:12px;text-align:left}
+th{color:var(--muted);font-weight:800;background:var(--panel2);position:sticky;top:0}
+tr:hover td{background:#f8fafc}
+.small{font-size:11px;color:var(--muted)}
+
+.chatLayout{display:grid;grid-template-columns:240px 1fr;gap:12px;height:100%}
+.userList{height:100%;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+.userItem{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}
+.userItem.active{background:#eef5ff}
+.chatPanel{display:grid;grid-template-rows:1fr auto;gap:10px;height:100%}
+.chatMessages{border:1px solid var(--border);border-radius:12px;padding:10px;overflow:auto;background:#fff}
+.chatComposer{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px}
+.chatInputWrap{display:flex;flex-direction:column;gap:6px}
+.chatComposer input{height:44px}
+.chatActions{display:flex;align-items:center;gap:8px}
+.chatComposer .sendBtn{min-width:84px;padding:8px 12px;height:40px;font-size:12px}
+.chatComposer .attachBtn{min-width:84px;padding:8px 12px;height:40px;font-size:12px}
+.attachPreview{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px dashed var(--border);font-size:12px;color:var(--muted)}
+.attachPreview .attachName{font-weight:700;color:var(--text)}
+.attachPreview .tiny{padding:4px 8px;border-radius:999px;font-size:11px}
+.attachments{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.attachLink{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);color:var(--text);text-decoration:none;font-size:11px}
+.attachLink:hover{border-color:var(--accent);color:var(--accent2)}
+.kpiGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px}
+.kpiCard{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--panel2);text-align:center}
+.kpiValue{font-size:18px;font-weight:800}
+.mapWrap{position:relative;height:460px;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+#reportMap{height:100%}
+.mapFallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel2);color:var(--muted);font-size:13px}
+.shareRow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.msg{margin-bottom:10px}
+.msg .meta{font-size:11px;color:var(--muted)}
+.msg .bubble{padding:8px 10px;border-radius:12px;display:inline-block;max-width:70%}
+.msg.me .bubble{background:#eaf2ff}
+.msg.other .bubble{background:#f3f4f6}
+
+.authWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.authCard{width:380px;border:1px solid var(--border);border-radius:16px;padding:16px;background:#fff;box-shadow:var(--shadow)}
+.authTabs{display:flex;gap:8px;margin-bottom:12px}
+.authTab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:#fff;text-align:center;cursor:pointer;font-weight:700;font-size:12px;color:var(--muted)}
+.authTab.active{color:var(--accent2);background:#eef5ff;border-color:#dbe8ff}
+
+.settingsLayout{display:grid;grid-template-columns:220px 1fr;gap:16px}
+.settingsNav{border:1px solid var(--border);border-radius:14px;background:#fff;padding:10px;box-shadow:var(--shadow);height:fit-content}
+.settingsTitle{font-weight:800;font-size:13px;color:var(--muted);padding:6px 10px}
+.settingsItem{width:100%;text-align:left;padding:10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-weight:700}
+.settingsItem.active{background:#eef5ff;border-color:#dbe8ff;color:var(--accent2)}
+.settingsPane{display:none}
+.settingsPane.active{display:block}
+.prefRow{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.prefRow:last-child{border-bottom:none}
+.switch{position:relative;display:inline-block;width:46px;height:24px}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#d1d5db;border-radius:999px;transition:0.2s}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:white;border-radius:50%;transition:0.2s}
+.switch input:checked + .slider{background:var(--accent)}
+.switch input:checked + .slider:before{transform:translateX(22px)}
+.segmented{display:flex;gap:8px;margin-top:8px}
+.segmented button{flex:unset;background:#fff;color:var(--button-light-text)}
+.segmented button.active{background:#eef5ff;border-color:#dbe8ff;color:var(--accent2)}
+.themeGrid{display:flex;gap:10px;margin-top:8px}
+.themeCard{border:1px solid var(--border);border-radius:10px;padding:10px;min-width:80px;text-align:center;background:#fff;color:var(--button-light-text);cursor:pointer}
+.themeCard.active{border-color:#dbe8ff;background:#eef5ff;color:var(--accent2)}
+
+#profileView{color:var(--text)}
+#profileView label{color:var(--label);font-weight:700;letter-spacing:.02em}
+#profileView input,
+#profileView select,
+#profileView textarea{
+  background:var(--field-bg);
+  border-color:var(--border);
+  color:var(--text);
+}
+#profileView input:focus,
+#profileView select:focus,
+#profileView textarea:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(47,135,226,.15);
+}
+#profileView select option{background:var(--panel);color:var(--text)}
+#profileView .card{border-color:var(--border);box-shadow:var(--profile-shadow)}
+#profileView .segmented button,
+#profileView .themeCard{background:var(--field-bg)}
+#profileView .btns button{padding:10px 16px;font-weight:700}
+#profileView .btns button.secondary{
+  background:var(--profile-secondary-bg);
+  color:var(--profile-secondary-text);
+  border-color:var(--profile-secondary-border);
+}
+#profileView .btns button.secondary:hover{background:var(--profile-secondary-hover)}
+#profileView .btns button:not(.secondary):not(.ghost){
+  background:linear-gradient(135deg,#2f87e2,#1f6fb8);
+  border-color:transparent;
+  box-shadow:0 6px 16px rgba(47,135,226,.25);
+}
+
+body.theme-dark{
+  --bg:#0f172a; --panel:#111827; --panel2:#0b1220;
+  --text:#e5e7eb; --muted:#9ca3af; --border:#1f2937;
+  --accent:#4aa8ff; --accent2:#84c5ff;
+  --sidebar:#0b1220; --sidebar2:#0b1220;
+  --sidebarText:#e5e7eb; --sidebarMuted:#9ca3af;
+  --ok:#34d399; --warn:#fbbf24;
+  --shadow:0 12px 26px rgba(0,0,0,.35);
+  --label:#cbd5f5;
+  --field-bg:#0b1220;
+  --profile-shadow:0 12px 24px rgba(0,0,0,.35);
+  --profile-secondary-bg:#1f2937;
+  --profile-secondary-border:#2a3646;
+  --profile-secondary-text:var(--text);
+  --profile-secondary-hover:#2a3646;
+  --button-light-text:var(--text);
+}
+body.theme-light{
+  --sidebar:#f8fafc;
+  --sidebar2:#f1f5f9;
+  --sidebarText:#1f2937;
+  --sidebarMuted:#64748b;
+}
+body.theme-dark .card,
+body.theme-dark .authCard,
+body.theme-dark .settingsNav,
+body.theme-dark .userList,
+body.theme-dark .chatMessages,
+body.theme-dark table{
+  background:var(--panel);
+  color:var(--text);
+}
+body.theme-dark input,
+body.theme-dark select,
+body.theme-dark textarea{
+  background-color:var(--panel);
+  color:var(--text);
+  border-color:var(--border);
+}
+body.theme-dark .topbar{background:var(--panel)}
+body.theme-dark .userChip{background:var(--panel2)}
+body.theme-dark th{background:var(--panel2)}
+body.theme-dark tr:hover td{background:rgba(255,255,255,.04)}
+body.theme-dark .pill{background:rgba(255,255,255,.06)}
+body.theme-dark .segmented button,
+body.theme-dark .themeCard,
+body.theme-dark .authTab{background:var(--panel)}
+body.theme-dark .segmented button.active,
+body.theme-dark .themeCard.active,
+body.theme-dark .authTab.active{background:rgba(132,197,255,.15)}
+body.theme-light .sidebar{border-right:1px solid var(--border)}
+body.theme-light .nav button:hover{background:rgba(47,135,226,.08)}
+body.theme-light .nav button.active{background:#eaf2ff;border-color:#dbe8ff;color:var(--accent2)}
+  </style>
+</head>
+<body>
+  <div id="authView" class="authWrap">
+    <div class="authCard">
+      <div class="authTabs">
+        <div class="authTab active" data-auth="login">Connexion</div>
+        <div class="authTab" data-auth="register">Inscription</div>
+      </div>
+      <div id="loginForm">
+        <label>Email</label>
+        <input id="loginEmail" type="email" placeholder="email@exemple.com"/>
+        <label>Mot de passe</label>
+        <input id="loginPassword" type="password" placeholder="*******"/>
+        <div class="btns">
+          <button id="btnLogin">Se connecter</button>
+        </div>
+      </div>
+      <div id="registerForm" class="hidden">
+        <label>Nom complet</label>
+        <input id="regName" placeholder="Prenom Nom"/>
+        <label>Email</label>
+        <input id="regEmail" type="email" placeholder="email@exemple.com"/>
+        <label>Telephone</label>
+        <input id="regPhone" placeholder="77 000 00 00"/>
+        <label>Mot de passe</label>
+        <input id="regPassword" type="password" placeholder="*******"/>
+        <div class="btns">
+          <button id="btnRegister">Creer le compte</button>
+        </div>
+      </div>
+      <div id="authStatus" class="status"></div>
+    </div>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>Espace expert</h1>
+          <p>Charge de suivi</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Profil</h2>
+        <div id="userInfo" class="small">Non connecte</div>
+        <div class="btns">
+          <button id="btnLogout" class="secondary">Deconnexion</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Navigation</h2>
+        <div class="nav">
+          <button class="tab active" data-tab="submitView">Observations</button>
+          <button class="tab" data-tab="reviewView" id="tabReview">Statuts</button>
+          <button class="tab" data-tab="searchView">Rapports</button>
+          <button class="tab" data-tab="chatView">Messagerie</button>
+          <button class="tab" data-tab="profileView">Parametres</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="titleBlock">
+          <div class="pageTitle" id="pageTitle">Observations</div>
+          <div class="pageSubtitle" id="pageSubtitle">Gestion des observations</div>
+        </div>
+        <div class="userChip">
+          <div class="avatar" id="userAvatar">NCD</div>
+          <div>
+            <div class="userName" id="userName">NCD Expert</div>
+            <div class="userRole" id="userRole">Charge de suivi</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div id="submitView" class="view active">
+          <div class="card">
+            <h2>Nouvelle observation (soumission)</h2>
+            <div class="row">
+              <div>
+                <label>Date</label>
+                <input id="obsDate" type="date"/>
+              </div>
+              <div>
+                <label>Effectif</label>
+                <input id="obsEffectif" type="number" min="0" placeholder="0"/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Zone</label>
+                <select id="obsZone"><option value="">-- Zone --</option></select>
+              </div>
+              <div>
+                <label>Site</label>
+                <select id="obsSite"><option value="">-- Site --</option></select>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>WiCode</label>
+                <input id="obsWiCode" list="wicodeList" placeholder="Ex: EGRGA"/>
+              </div>
+              <div>
+                <label>Code francais</label>
+                <input id="obsCodeFr" list="codeFrList" placeholder="Ex: aiggar"/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Nom francais</label>
+                <input id="obsNomFr" list="nomFrList" placeholder="Aigrette garzette"/>
+              </div>
+              <div>
+                <label>Nom scientifique</label>
+                <input id="obsNomSc" list="nomScList" placeholder="Egretta garzetta"/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Nom anglais</label>
+                <input id="obsEnglish" list="englishList" placeholder="Little Egret"/>
+              </div>
+              <div>
+                <label>Famille</label>
+                <input id="obsFamille" list="familleList" placeholder="Ardeidae"/>
+              </div>
+            </div>
+            <datalist id="wicodeList"></datalist>
+            <datalist id="codeFrList"></datalist>
+            <datalist id="nomFrList"></datalist>
+            <datalist id="nomScList"></datalist>
+            <datalist id="englishList"></datalist>
+            <datalist id="familleList"></datalist>
+            <div class="row">
+              <div>
+                <label>Transect</label>
+                <input id="obsTransect" placeholder=""/>
+              </div>
+              <div>
+                <label>Point</label>
+                <input id="obsPoint" placeholder=""/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>UTM</label>
+                <input id="obsUtm" placeholder=""/>
+              </div>
+              <div>
+                <label>Statut conservation</label>
+                <input id="obsStatut" placeholder="LC/NT/EN..."/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Latitude</label>
+                <input id="obsLat" placeholder="14.72"/>
+              </div>
+              <div>
+                <label>Longitude</label>
+                <input id="obsLon" placeholder="-17.18"/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Observateurs</label>
+                <input id="obsObservateurs" placeholder="Nom de l'observateur"/>
+              </div>
+              <div>
+                <label>Photo (URL)</label>
+                <input id="obsPhoto" placeholder="https://..."/>
+              </div>
+            </div>
+            <label>Observations</label>
+            <textarea id="obsNotes" placeholder="Notes terrain..."></textarea>
+            <div class="btns">
+              <button id="btnUseLocation" class="secondary">Utiliser ma position</button>
+              <button id="btnSubmitObs">Soumettre</button>
+            </div>
+            <div id="submitStatus" class="status"></div>
+          </div>
+
+          <div class="card">
+            <h2>Mes soumissions</h2>
+            <div class="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Zone</th>
+                    <th>Site</th>
+                    <th>WiCode</th>
+                    <th>Effectif</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="myPendingBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div id="reviewView" class="view">
+          <div class="card">
+            <h2>Validation des observations</h2>
+            <div id="reviewHint" class="small"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Zone</th>
+                  <th>Site</th>
+                  <th>WiCode</th>
+                  <th>Effectif</th>
+                  <th>Auteur</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="reviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="searchView" class="view">
+          <div class="card">
+            <h2>Recherche & Export</h2>
+            <label>Recherche texte</label>
+            <input id="searchQ" placeholder="Espece, site, zone, famille, code..."/>
+            <div class="row">
+              <div>
+                <label>Zone</label>
+                <select id="searchZone"><option value="">Toutes</option></select>
+              </div>
+              <div>
+                <label>Site</label>
+                <select id="searchSite"><option value="">Tous</option></select>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Date debut</label>
+                <input id="searchDateFrom" type="date"/>
+              </div>
+              <div>
+                <label>Date fin</label>
+                <input id="searchDateTo" type="date"/>
+              </div>
+            </div>
+            <div class="row">
+              <div>
+                <label>Effectif min</label>
+                <input id="searchMin" type="number" min="0"/>
+              </div>
+              <div>
+                <label>Effectif max</label>
+                <input id="searchMax" type="number" min="0"/>
+              </div>
+            </div>
+            <div class="btns">
+              <button id="btnRunSearch">Rechercher</button>
+              <button id="btnExportPdf" class="secondary">Telecharger PDF</button>
+            </div>
+            <div class="status" id="searchStatus"></div>
+          </div>
+
+          <div class="card">
+            <h2>Resultats</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Titre</th>
+                  <th>Famille</th>
+                  <th>Zone</th>
+                  <th>Site</th>
+                  <th>Effectif</th>
+                </tr>
+              </thead>
+              <tbody id="searchBody"></tbody>
+            </table>
+            <div class="btns">
+              <button id="prevSearch" class="secondary">Precedent</button>
+              <button id="nextSearch" class="secondary">Suivant</button>
+            </div>
+          </div>
+
+          <div class="card hidden" id="reportStatsCard">
+            <h2>Statistiques de la recherche</h2>
+            <div class="kpiGrid">
+              <div class="kpiCard">
+                <div class="kpiValue" id="kpiObservations">0</div>
+                <div class="small">Observations</div>
+              </div>
+              <div class="kpiCard">
+                <div class="kpiValue" id="kpiSpecies">0</div>
+                <div class="small">Especes</div>
+              </div>
+              <div class="kpiCard">
+                <div class="kpiValue" id="kpiSites">0</div>
+                <div class="small">Sites</div>
+              </div>
+              <div class="kpiCard">
+                <div class="kpiValue" id="kpiZones">0</div>
+                <div class="small">Zones</div>
+              </div>
+            </div>
+            <canvas id="reportStatsChart"></canvas>
+          </div>
+
+          <div class="card hidden" id="reportMapCard">
+            <h2>Carte des resultats</h2>
+            <div class="mapWrap">
+              <div id="reportMap"></div>
+              <div id="reportMapFallback" class="mapFallback hidden">Carte indisponible</div>
+            </div>
+          </div>
+
+          <div class="card" id="reportShareCard">
+            <h2>Partager les resultats</h2>
+            <div class="shareRow">
+              <div>
+                <label>Partager avec</label>
+                <select id="shareUser">
+                  <option value="">Choisir un membre</option>
+                </select>
+              </div>
+              <div>
+                <label>Message (optionnel)</label>
+                <input id="shareNote" placeholder="Ajoutez un commentaire..."/>
+              </div>
+            </div>
+            <div class="btns">
+              <button id="btnShareReport" class="secondary">Partager</button>
+            </div>
+            <div class="status" id="shareStatus"></div>
+          </div>
+
+          <div class="card">
+            <h2>Comparaison evolution</h2>
+            <div class="row">
+              <div>
+                <label>Date debut</label>
+                <input id="evoDateFrom" type="date"/>
+              </div>
+              <div>
+                <label>Date fin</label>
+                <input id="evoDateTo" type="date"/>
+              </div>
+            </div>
+            <div class="btns">
+              <button id="btnRunEvolution">Comparer</button>
+            </div>
+            <div id="evoStats" class="status"></div>
+            <canvas id="evoChart"></canvas>
+          </div>
+        </div>
+        <div id="chatView" class="view">
+          <div class="chatLayout">
+            <div class="userList" id="userList"></div>
+            <div class="chatPanel">
+              <div id="chatMessages" class="chatMessages"></div>
+              <div class="chatComposer">
+                <div class="chatInputWrap">
+                  <input id="chatInput" placeholder="Votre message..."/>
+                  <div id="chatAttachment" class="attachPreview hidden">
+                    <span class="attachName" id="chatAttachmentName">piece_jointe</span>
+                    <button id="chatAttachmentClear" class="ghost tiny" type="button">Retirer</button>
+                  </div>
+                </div>
+                <div class="chatActions">
+                  <input id="chatFile" type="file" class="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"/>
+                  <button id="btnAttach" class="secondary attachBtn" type="button">Joindre</button>
+                  <button id="btnSendMsg" class="sendBtn" type="button">Envoyer</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="profileView" class="view">
+          <div class="settingsLayout">
+            <div class="settingsNav">
+              <div class="settingsTitle">Parametres</div>
+              <button class="settingsItem active" data-section="profileSection">Profil</button>
+              <button class="settingsItem" data-section="notificationsSection">Notifications</button>
+              <button class="settingsItem" data-section="preferencesSection">Preferences</button>
+              <button class="settingsItem" data-section="securitySection">Securite</button>
+              <button class="settingsItem" data-section="integrationsSection">Integrations</button>
+            </div>
+            <div class="settingsContent">
+              <div id="profileSection" class="settingsPane active">
+                <div class="card">
+                  <div class="cardHeader">Informations du profil</div>
+                  <div class="row">
+                    <div>
+                      <label>Prenom</label>
+                      <input id="profileFirstName" placeholder="Prenom"/>
+                    </div>
+                    <div>
+                      <label>Nom</label>
+                      <input id="profileLastName" placeholder="Nom"/>
+                    </div>
+                  </div>
+                  <label>Email</label>
+                  <input id="profileEmail" type="email" placeholder="email@exemple.com"/>
+                  <label>Telephone</label>
+                  <input id="profilePhone" placeholder="+221 77 000 00 00"/>
+                  <label>Organisation</label>
+                  <input id="profileOrg" placeholder="Organisation"/>
+                  <label>Biographie</label>
+                  <textarea id="profileBio" placeholder="Votre experience, domaine, etc."></textarea>
+                  <div class="btns end">
+                    <button class="secondary" id="btnProfileCancel">Annuler</button>
+                    <button id="btnUpdateProfile">Enregistrer les modifications</button>
+                  </div>
+                  <div id="profileStatus" class="status"></div>
+                </div>
+              </div>
+
+              <div id="notificationsSection" class="settingsPane">
+                <div class="card">
+                  <div class="cardHeader">Preferences d'affichage</div>
+                  <div class="prefRow">
+                    <div>
+                      <div>Mode sombre</div>
+                      <div class="small">Activer le mode sombre pour un confort visuel accru</div>
+                    </div>
+                    <label class="switch">
+                      <input id="prefDarkMode" type="checkbox"/>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                  <div class="prefRow">
+                    <div>
+                      <div>Notifications push</div>
+                      <div class="small">Recevoir les notifications en temps reel</div>
+                    </div>
+                    <label class="switch">
+                      <input id="prefPush" type="checkbox"/>
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div id="preferencesSection" class="settingsPane">
+                <div class="card">
+                  <div class="cardHeader">Preferences</div>
+                  <label>Langue</label>
+                  <div class="segmented">
+                    <button type="button" class="secondary active" data-lang="fr">Francais</button>
+                    <button type="button" class="secondary" data-lang="en">English</button>
+                    <button type="button" class="secondary" data-lang="es">Espanol</button>
+                  </div>
+                  <label>Theme de couleur</label>
+                  <div class="themeGrid">
+                    <div class="themeCard active" data-theme="light">Clair</div>
+                    <div class="themeCard" data-theme="dark">Sombre</div>
+                    <div class="themeCard" data-theme="auto">Auto</div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="securitySection" class="settingsPane">
+                <div class="card">
+                  <div class="cardHeader">Securite</div>
+                  <label>Nouveau mot de passe</label>
+                  <input id="profilePassword" type="password" placeholder="*******"/>
+                  <div class="btns end">
+                    <button class="secondary" id="btnPasswordClear">Annuler</button>
+                    <button id="btnUpdatePassword">Mettre a jour</button>
+                  </div>
+                  <div id="passwordStatus" class="status"></div>
+                </div>
+              </div>
+
+              <div id="integrationsSection" class="settingsPane">
+                <div class="card">
+                  <div class="cardHeader">Integrations</div>
+                  <div class="small">Aucune integration active pour le moment.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+const API_BASE = "api.php";
+const $ = (id) => document.getElementById(id);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+const state = {
+  user: null,
+  tab: "submitView",
+  searchPage: 1,
+  searchPageSize: 25,
+  prefs: null,
+  profileExtras: null,
+  users: [],
+  lastFilters: null,
+  lastTotal: 0,
+  reportStats: null,
+  species: { items: [], maps: {} },
+  chat: { withUserId: null, lastId: 0, source: null, attachment: null }
+};
+
+const PREFS_KEY = "charge_suivi_prefs";
+const EXTRAS_KEY = "charge_suivi_profile_extras";
+
+const pageMeta = {
+  submitView: { title: "Observations", subtitle: "Gestion des observations" },
+  reviewView: { title: "Statuts", subtitle: "Validation des observations" },
+  searchView: { title: "Rapports", subtitle: "Recherche et export" },
+  chatView: { title: "Messagerie", subtitle: "Echanges entre membres" },
+  profileView: { title: "Parametres", subtitle: "Informations du profil" }
+};
+
+function setTab(tabId) {
+  state.tab = tabId;
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabId));
+  $$(".view").forEach(v => v.classList.toggle("active", v.id === tabId));
+  updatePageMeta(tabId);
+  if (tabId === "searchView" && reportMap) {
+    setTimeout(() => reportMap.resize(), 80);
+  }
+}
+
+function updatePageMeta(tabId) {
+  const meta = pageMeta[tabId] || { title: "", subtitle: "" };
+  $("pageTitle").textContent = meta.title;
+  $("pageSubtitle").textContent = meta.subtitle;
+}
+
+function showAuth(show) {
+  $("authView").classList.toggle("hidden", !show);
+  $("appView").classList.toggle("hidden", show);
+}
+
+async function safeFetchJson(url, options = {}) {
+  const res = await fetch(url, { credentials: "include", ...options });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(text || ("HTTP " + res.status));
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Bad JSON");
+  }
+}
+
+function buildParams(route, params = {}) {
+  const p = new URLSearchParams({ route });
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== "" && v != null) p.set(k, v);
+  });
+  return p.toString();
+}
+
+async function apiGet(route, params = {}) {
+  return safeFetchJson(API_BASE + "?" + buildParams(route, params));
+}
+
+async function apiPost(route, payload = {}) {
+  return safeFetchJson(API_BASE + "?" + buildParams(route), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function apiPostForm(route, formData) {
+  return safeFetchJson(API_BASE + "?" + buildParams(route), {
+    method: "POST",
+    body: formData
+  });
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let idx = 0;
+  while (size >= 1024 && idx < units.length - 1) {
+    size /= 1024;
+    idx += 1;
+  }
+  return `${size.toFixed(size >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+}
+function loadLocalJson(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return { ...fallback };
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return { ...fallback };
+    return { ...fallback, ...data };
+  } catch {
+    return { ...fallback };
+  }
+}
+
+function saveLocalJson(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+function splitName(fullName) {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
+function getInitials(fullName) {
+  const parts = String(fullName || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "NA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function loadProfilePrefs() {
+  const defaults = { darkMode: false, push: true, language: "fr", theme: "light" };
+  state.prefs = loadLocalJson(PREFS_KEY, defaults);
+  return state.prefs;
+}
+
+function saveProfilePrefs(next) {
+  state.prefs = { ...(state.prefs || {}), ...next };
+  saveLocalJson(PREFS_KEY, state.prefs);
+}
+
+function loadProfileExtras() {
+  const defaults = { org: "", bio: "" };
+  state.profileExtras = loadLocalJson(EXTRAS_KEY, defaults);
+  return state.profileExtras;
+}
+
+function saveProfileExtras(next) {
+  state.profileExtras = { ...(state.profileExtras || {}), ...next };
+  saveLocalJson(EXTRAS_KEY, state.profileExtras);
+}
+
+function getEffectiveTheme(prefs) {
+  const theme = prefs.theme || "light";
+  if (theme !== "auto") return theme;
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+  return "light";
+}
+
+function applyTheme(prefs) {
+  const effective = getEffectiveTheme(prefs);
+  document.body.classList.toggle("theme-dark", effective === "dark");
+  document.body.classList.toggle("theme-light", effective === "light");
+}
+
+function applyPrefsUI(prefs) {
+  const effective = getEffectiveTheme(prefs);
+  if ($("prefDarkMode")) $("prefDarkMode").checked = effective === "dark";
+  if ($("prefPush")) $("prefPush").checked = !!prefs.push;
+  $$(".segmented button[data-lang]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.lang === prefs.language);
+  });
+  $$(".themeCard").forEach(card => {
+    card.classList.toggle("active", card.dataset.theme === prefs.theme);
+  });
+}
+
+function collectProfilePrefs() {
+  const activeLang = document.querySelector(".segmented button.active");
+  const activeTheme = document.querySelector(".themeCard.active");
+  return {
+    darkMode: $("prefDarkMode") ? $("prefDarkMode").checked : false,
+    push: $("prefPush") ? $("prefPush").checked : false,
+    language: activeLang ? activeLang.dataset.lang : "fr",
+    theme: activeTheme ? activeTheme.dataset.theme : "light"
+  };
+}
+
+function applyProfileFields() {
+  if (!state.user) return;
+  const nameParts = splitName(state.user.full_name || "");
+  const extras = loadProfileExtras();
+  $("profileFirstName").value = nameParts.first;
+  $("profileLastName").value = nameParts.last;
+  $("profileEmail").value = state.user.email || "";
+  $("profilePhone").value = state.user.phone || "";
+  $("profileOrg").value = extras.org || "";
+  $("profileBio").value = extras.bio || "";
+  if ($("profilePassword")) $("profilePassword").value = "";
+  if ($("profileStatus")) $("profileStatus").textContent = "";
+  if ($("passwordStatus")) $("passwordStatus").textContent = "";
+  const prefs = loadProfilePrefs();
+  applyTheme(prefs);
+  applyPrefsUI(prefs);
+}
+
+function normalizeSpeciesValue(value) {
+  let v = String(value || "").trim();
+  if (!v) return "";
+  if (typeof v.normalize === "function") {
+    v = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  v = v.replace(/\s+/g, " ").toUpperCase();
+  return v;
+}
+
+function fillDatalist(id, values) {
+  const list = $(id);
+  if (!list) return;
+  list.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  values.forEach(value => {
+    if (!value) return;
+    const opt = document.createElement("option");
+    opt.value = value;
+    frag.appendChild(opt);
+  });
+  list.appendChild(frag);
+}
+
+function indexSpeciesOptions(items) {
+  const maps = {
+    wicode: new Map(),
+    code_fr: new Map(),
+    nom_fr: new Map(),
+    nom_sc: new Map(),
+    english: new Map(),
+    famille: new Map()
+  };
+  const sets = {
+    wicode: new Set(),
+    code_fr: new Set(),
+    nom_fr: new Set(),
+    nom_sc: new Set(),
+    english: new Set(),
+    famille: new Set()
+  };
+  const setMap = (map, value, item) => {
+    const key = normalizeSpeciesValue(value);
+    if (!key || map.has(key)) return;
+    map.set(key, item);
+  };
+  items.forEach(item => {
+    const wicode = (item.wicode || "").trim();
+    const codeFr = (item.code_fr || "").trim();
+    const nomFr = (item.nom_fr || "").trim();
+    const nomSc = (item.nom_sc || "").trim();
+    const english = (item.english || "").trim();
+    const famille = (item.famille || "").trim();
+    if (wicode) { sets.wicode.add(wicode); setMap(maps.wicode, wicode, item); }
+    if (codeFr) { sets.code_fr.add(codeFr); setMap(maps.code_fr, codeFr, item); }
+    if (nomFr) { sets.nom_fr.add(nomFr); setMap(maps.nom_fr, nomFr, item); }
+    if (nomSc) { sets.nom_sc.add(nomSc); setMap(maps.nom_sc, nomSc, item); }
+    if (english) { sets.english.add(english); setMap(maps.english, english, item); }
+    if (famille) { sets.famille.add(famille); setMap(maps.famille, famille, item); }
+  });
+  state.species.items = items;
+  state.species.maps = maps;
+  fillDatalist("wicodeList", Array.from(sets.wicode).sort((a, b) => a.localeCompare(b)));
+  fillDatalist("codeFrList", Array.from(sets.code_fr).sort((a, b) => a.localeCompare(b)));
+  fillDatalist("nomFrList", Array.from(sets.nom_fr).sort((a, b) => a.localeCompare(b)));
+  fillDatalist("nomScList", Array.from(sets.nom_sc).sort((a, b) => a.localeCompare(b)));
+  fillDatalist("englishList", Array.from(sets.english).sort((a, b) => a.localeCompare(b)));
+  fillDatalist("familleList", Array.from(sets.famille).sort((a, b) => a.localeCompare(b)));
+}
+
+function applySpeciesFrom(fieldKey, value) {
+  if (!value || !state.species.maps[fieldKey]) return;
+  const key = normalizeSpeciesValue(value);
+  const entry = state.species.maps[fieldKey].get(key);
+  if (!entry) return;
+  if (entry.wicode) $("obsWiCode").value = entry.wicode;
+  if (entry.code_fr) $("obsCodeFr").value = entry.code_fr;
+  if (entry.nom_fr) $("obsNomFr").value = entry.nom_fr;
+  if (entry.nom_sc) $("obsNomSc").value = entry.nom_sc;
+  if (entry.english) $("obsEnglish").value = entry.english;
+  if (entry.famille) $("obsFamille").value = entry.famille;
+}
+
+function renderUserInfo() {
+  if (!state.user) return;
+  $("userInfo").textContent = `${state.user.full_name} (${state.user.role})`;
+  $("userName").textContent = state.user.full_name || "Utilisateur";
+  $("userRole").textContent = state.user.role || "";
+  $("userAvatar").textContent = getInitials(state.user.full_name || "");
+  applyProfileFields();
+}
+
+async function checkAuth() {
+  try {
+    const res = await apiGet("auth/me");
+    state.user = res.user;
+    renderUserInfo();
+    showAuth(false);
+    setupRoleViews();
+    await initData();
+  } catch (err) {
+    showAuth(true);
+  }
+}
+
+function setupRoleViews() {
+  const canReview = ["controleur", "admin"].includes(state.user.role);
+  const reviewTab = $("tabReview");
+  if (reviewTab) {
+    reviewTab.classList.toggle("hidden", !canReview);
+  }
+}
+
+async function initData() {
+  await Promise.all([loadZones(), loadSpeciesOptions(), loadMyPending(), loadUsers()]);
+  if (["controleur", "admin"].includes(state.user.role)) {
+    await loadReviewList();
+  }
+}
+
+// Auth UI
+$$(".authTab").forEach(tab => tab.addEventListener("click", () => {
+  $$(".authTab").forEach(t => t.classList.remove("active"));
+  tab.classList.add("active");
+  const mode = tab.dataset.auth;
+  $("loginForm").classList.toggle("hidden", mode !== "login");
+  $("registerForm").classList.toggle("hidden", mode !== "register");
+}));
+
+$("btnLogin").addEventListener("click", async () => {
+  $("authStatus").textContent = "";
+  try {
+    const res = await apiPost("auth/login", {
+      email: $("loginEmail").value.trim(),
+      password: $("loginPassword").value
+    });
+    state.user = res.user;
+    renderUserInfo();
+    showAuth(false);
+    setupRoleViews();
+    await initData();
+  } catch (err) {
+    $("authStatus").textContent = "Erreur connexion";
+  }
+});
+
+$("btnRegister").addEventListener("click", async () => {
+  $("authStatus").textContent = "";
+  try {
+    await apiPost("auth/register", {
+      full_name: $("regName").value.trim(),
+      email: $("regEmail").value.trim(),
+      phone: $("regPhone").value.trim(),
+      password: $("regPassword").value
+    });
+    $("authStatus").textContent = "Compte cree, connectez-vous.";
+  } catch (err) {
+    $("authStatus").textContent = "Erreur inscription";
+  }
+});
+
+$("btnLogout").addEventListener("click", async () => {
+  await apiPost("auth/logout", {});
+  state.user = null;
+  showAuth(true);
+});
+
+// Tabs
+$$(".tab").forEach(el => el.addEventListener("click", () => setTab(el.dataset.tab)));
+
+// Settings sections
+$$(".settingsItem").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $$(".settingsItem").forEach(item => item.classList.remove("active"));
+    btn.classList.add("active");
+    const target = btn.dataset.section;
+    $$(".settingsPane").forEach(pane => pane.classList.toggle("active", pane.id === target));
+  });
+});
+
+const themeMedia = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+if (themeMedia) {
+  themeMedia.addEventListener("change", () => {
+    const prefs = loadProfilePrefs();
+    if (prefs.theme === "auto") {
+      applyTheme(prefs);
+      applyPrefsUI(prefs);
+    }
+  });
+}
+
+// Zones/Sites
+async function loadZones() {
+  const zones = await apiGet("filters/zones");
+  ["obsZone","searchZone"].forEach(id => {
+    const sel = $(id);
+    sel.innerHTML = "<option value=''>Toutes</option>";
+    zones.items.forEach(z => {
+      const opt = document.createElement("option");
+      opt.value = z; opt.textContent = z;
+      sel.appendChild(opt);
+    });
+  });
+  await loadSites("");
+}
+
+async function loadSites(zone) {
+  const sites = await apiGet("filters/sites", { zone });
+  ["obsSite","searchSite"].forEach(id => {
+    const sel = $(id);
+    sel.innerHTML = "<option value=''>Tous</option>";
+    sites.items.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+async function loadSpeciesOptions() {
+  try {
+    const res = await apiGet("observations/species");
+    indexSpeciesOptions(res.items || []);
+  } catch (err) {
+    // Optional: keep manual input if species list fails.
+  }
+}
+
+$("obsZone").addEventListener("change", async () => loadSites($("obsZone").value));
+$("searchZone").addEventListener("change", async () => loadSites($("searchZone").value));
+
+const speciesFieldMap = {
+  obsWiCode: "wicode",
+  obsCodeFr: "code_fr",
+  obsNomFr: "nom_fr",
+  obsNomSc: "nom_sc",
+  obsEnglish: "english"
+};
+
+Object.entries(speciesFieldMap).forEach(([id, key]) => {
+  const input = $(id);
+  if (!input) return;
+  input.addEventListener("change", () => applySpeciesFrom(key, input.value));
+});
+
+// Observation submission
+$("btnUseLocation").addEventListener("click", () => {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    $("obsLat").value = pos.coords.latitude.toFixed(6);
+    $("obsLon").value = pos.coords.longitude.toFixed(6);
+  });
+});
+
+$("btnSubmitObs").addEventListener("click", async () => {
+  $("submitStatus").textContent = "";
+  try {
+    await apiPost("pending/create", {
+      date: $("obsDate").value,
+      zone: $("obsZone").value,
+      site: $("obsSite").value,
+      transect: $("obsTransect").value,
+      point: $("obsPoint").value,
+      utm: $("obsUtm").value,
+      lat: $("obsLat").value,
+      lon: $("obsLon").value,
+      wiCode: $("obsWiCode").value,
+      code_fr: $("obsCodeFr").value,
+      nom_fr: $("obsNomFr").value,
+      nomScientifique: $("obsNomSc").value,
+      englishName: $("obsEnglish").value,
+      famille: $("obsFamille").value,
+      effectif: $("obsEffectif").value,
+      statutDeConservation: $("obsStatut").value,
+      observateurs: $("obsObservateurs").value,
+      observations: $("obsNotes").value,
+      photo: $("obsPhoto").value
+    });
+    $("submitStatus").textContent = "Soumission envoyee.";
+    await loadMyPending();
+  } catch (err) {
+    $("submitStatus").textContent = "Erreur de soumission.";
+  }
+});
+
+async function loadMyPending() {
+  const res = await apiGet("pending/list", { limit: 200 });
+  const body = $("myPendingBody");
+  body.innerHTML = "";
+  res.items.forEach(row => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.date || ""}</td>
+      <td>${row.zone || ""}</td>
+      <td>${row.site || ""}</td>
+      <td>${row.wiCode || ""}</td>
+      <td>${row.effectif || ""}</td>
+      <td><span class="pill ${row.status === "approved" ? "ok" : "warn"}">${row.status}</span></td>
+    `;
+    body.appendChild(tr);
+  });
+  if (!res.items.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td colspan='6' class='small'>Aucune soumission</td>";
+    body.appendChild(tr);
+  }
+}
+
+// Review
+async function loadReviewList() {
+  $("reviewHint").textContent = "";
+  try {
+    const res = await apiGet("pending/review", { status: "pending", limit: 200 });
+    const body = $("reviewBody");
+    body.innerHTML = "";
+    res.items.forEach(row => {
+      const tr = document.createElement("tr");
+      const author = row.user_name ? `${row.user_name}` : `#${row.user_id}`;
+      tr.innerHTML = `
+        <td>${row.date || ""}</td>
+        <td>${row.zone || ""}</td>
+        <td>${row.site || ""}</td>
+        <td>${row.wiCode || ""}</td>
+        <td>${row.effectif || ""}</td>
+        <td>${author}</td>
+        <td>
+          <button class="secondary" data-approve="${row.id}">Valider</button>
+          <button class="ghost" data-reject="${row.id}">Rejeter</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll("[data-approve]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.approve);
+        await apiPost("pending/approve", { id });
+        await loadReviewList();
+      });
+    });
+    body.querySelectorAll("[data-reject]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.reject);
+        const note = prompt("Motif de rejet (optionnel):") || "";
+        await apiPost("pending/reject", { id, note });
+        await loadReviewList();
+      });
+    });
+    if (!res.items.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td colspan='7' class='small'>Aucune observation en attente</td>";
+      body.appendChild(tr);
+    }
+  } catch (err) {
+    $("reviewHint").textContent = "Acces refuse.";
+  }
+}
+
+// Search
+function collectSearchFilters() {
+  return {
+    q: $("searchQ").value.trim(),
+    zone: $("searchZone").value,
+    site: $("searchSite").value,
+    date_from: $("searchDateFrom").value || "",
+    date_to: $("searchDateTo").value || "",
+    count_min: $("searchMin").value || "",
+    count_max: $("searchMax").value || ""
+  };
+}
+
+async function runSearch() {
+  $("searchStatus").textContent = "";
+  const filters = collectSearchFilters();
+  try {
+    const res = await apiGet("observations", {
+      ...filters,
+      page: state.searchPage,
+      page_size: state.searchPageSize
+    });
+    const body = $("searchBody");
+    body.innerHTML = "";
+    res.items.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.date || ""}</td>
+        <td>${row.title || ""}</td>
+        <td>${row.famille || ""}</td>
+        <td>${row.zone || ""}</td>
+        <td>${row.site || ""}</td>
+        <td>${row.effectif || ""}</td>
+      `;
+      body.appendChild(tr);
+    });
+    if (!res.items.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td colspan='6' class='small'>Aucun resultat</td>";
+      body.appendChild(tr);
+    }
+    $("searchStatus").textContent = `${res.total} resultat(s)`;
+    state.lastFilters = filters;
+    state.lastTotal = res.total;
+    setReportVisibility(true);
+    await Promise.all([loadReportStats(filters), loadReportMap(filters)]);
+  } catch (err) {
+    $("searchStatus").textContent = "Erreur recherche";
+  }
+}
+
+$("btnRunSearch").addEventListener("click", () => { state.searchPage = 1; runSearch(); });
+$("prevSearch").addEventListener("click", () => { state.searchPage = Math.max(1, state.searchPage - 1); runSearch(); });
+$("nextSearch").addEventListener("click", () => { state.searchPage += 1; runSearch(); });
+$("btnExportPdf").addEventListener("click", () => {
+  const params = new URLSearchParams({ route: "observations/export", ...collectSearchFilters() });
+  window.open(API_BASE + "?" + params.toString(), "_blank");
+});
+
+$("btnShareReport").addEventListener("click", async () => {
+  $("shareStatus").textContent = "";
+  const userId = Number($("shareUser").value || 0);
+  if (!userId) {
+    $("shareStatus").textContent = "Choisissez un membre.";
+    return;
+  }
+  if (!state.lastTotal || state.lastTotal <= 0) {
+    $("shareStatus").textContent = "Aucun resultat a partager.";
+    return;
+  }
+  const note = $("shareNote").value.trim();
+  const message = (note ? note + "\n\n" : "") + buildShareMessage();
+  try {
+    await apiPost("messages/send", { recipient_id: userId, body: message });
+    $("shareStatus").textContent = "Partage envoye.";
+    $("shareNote").value = "";
+  } catch (err) {
+    $("shareStatus").textContent = "Erreur lors du partage.";
+  }
+});
+
+async function loadReportStats(filters) {
+  try {
+    const stats = await apiGet("observations/stats", filters);
+    state.reportStats = stats;
+    $("kpiObservations").textContent = stats.kpis?.observations ?? 0;
+    $("kpiSpecies").textContent = stats.kpis?.species ?? 0;
+    $("kpiSites").textContent = stats.kpis?.sites ?? 0;
+    $("kpiZones").textContent = stats.kpis?.zones ?? 0;
+    const labels = (stats.time || []).map(x => x.label);
+    const values = (stats.time || []).map(x => x.value);
+    reportStatsChart?.destroy();
+    reportStatsChart = new Chart($("reportStatsChart"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Observations", data: values, backgroundColor: "#6aa6ff" }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+  } catch (err) {
+    $("kpiObservations").textContent = "0";
+    $("kpiSpecies").textContent = "0";
+    $("kpiSites").textContent = "0";
+    $("kpiZones").textContent = "0";
+  }
+}
+
+function ensureReportMap() {
+  const fallback = $("reportMapFallback");
+  if (!window.maplibregl || !window.maplibregl.Map) {
+    fallback.textContent = "Carte indisponible.";
+    fallback.classList.remove("hidden");
+    return false;
+  }
+  if (typeof window.maplibregl.supported === "function" && !window.maplibregl.supported()) {
+    fallback.textContent = "Carte indisponible.";
+    fallback.classList.remove("hidden");
+    return false;
+  }
+  fallback.classList.add("hidden");
+  if (reportMap) return true;
+  reportMap = new maplibregl.Map({
+    container: "reportMap",
+    style: reportMapStyle,
+    center: [-14.5, 14.5],
+    zoom: 5
+  });
+  reportMap.addControl(new maplibregl.NavigationControl(), "top-right");
+  reportMap.on("load", () => {
+    if (!reportMap.getSource("reportObs")) {
+      reportMap.addSource("reportObs", { type: "geojson", data: { type: "FeatureCollection", features: [] }, cluster: true, clusterMaxZoom: 12, clusterRadius: 40 });
+      reportMap.addLayer({
+        id: "report-clusters",
+        type: "circle",
+        source: "reportObs",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#5aa3e6",
+          "circle-radius": ["step", ["get", "point_count"], 14, 25, 20, 50, 26]
+        }
+      });
+      reportMap.addLayer({
+        id: "report-cluster-count",
+        type: "symbol",
+        source: "reportObs",
+        filter: ["has", "point_count"],
+        layout: { "text-field": "{point_count_abbreviated}", "text-size": 12 }
+      });
+      reportMap.addLayer({
+        id: "report-points",
+        type: "circle",
+        source: "reportObs",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-color": "#2f87e2",
+          "circle-radius": 6,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.5
+        }
+      });
+    }
+  });
+  return true;
+}
+
+async function loadReportMap(filters) {
+  if (!ensureReportMap()) return;
+  try {
+    const geojson = await apiGet("observations/geo", filters);
+    const applyData = () => {
+      if (!reportMap || !reportMap.getSource("reportObs")) return;
+      reportMap.getSource("reportObs").setData(geojson);
+      const hasPoints = geojson.features && geojson.features.length;
+      $("reportMapFallback").textContent = hasPoints ? "" : "Aucun point a afficher.";
+      $("reportMapFallback").classList.toggle("hidden", !!hasPoints);
+      if (hasPoints) {
+        const coords = geojson.features.map(f => f.geometry.coordinates);
+        const lons = coords.map(c => c[0]);
+        const lats = coords.map(c => c[1]);
+        const bounds = [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)]
+        ];
+        reportMap.fitBounds(bounds, { padding: 40, maxZoom: 11 });
+      }
+    };
+    if (reportMap && reportMap.isStyleLoaded()) {
+      applyData();
+    } else if (reportMap) {
+      reportMap.once("load", applyData);
+    }
+  } catch (err) {
+    $("reportMapFallback").classList.remove("hidden");
+  }
+}
+
+// Evolution
+let evoChart = null;
+let reportStatsChart = null;
+let reportMap = null;
+const reportMapStyle = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "(c) OpenStreetMap contributors"
+    }
+  },
+  layers: [{ id: "osm", type: "raster", source: "osm" }]
+};
+
+function setReportVisibility(hasData) {
+  $("reportStatsCard").classList.toggle("hidden", !hasData);
+  $("reportMapCard").classList.toggle("hidden", !hasData);
+  if (hasData && reportMap) {
+    setTimeout(() => reportMap.resize(), 50);
+  }
+}
+
+function updateShareUsers(users) {
+  const sel = $("shareUser");
+  if (!sel) return;
+  sel.innerHTML = "<option value=''>Choisir un membre</option>";
+  users.forEach(user => {
+    if (user.is_self) return;
+    const opt = document.createElement("option");
+    opt.value = user.id;
+    opt.textContent = `${user.full_name} (${user.role})`;
+    sel.appendChild(opt);
+  });
+}
+
+function buildShareMessage() {
+  const stats = state.reportStats;
+  const filters = state.lastFilters || {};
+  const parts = [];
+  if (filters.q) parts.push(`Recherche: "${filters.q}"`);
+  if (filters.zone) parts.push(`Zone: ${filters.zone}`);
+  if (filters.site) parts.push(`Site: ${filters.site}`);
+  if (filters.date_from || filters.date_to) {
+    parts.push(`Dates: ${filters.date_from || "..."} -> ${filters.date_to || "..."}`);
+  }
+  const exportParams = new URLSearchParams({ route: "observations/export", ...filters });
+  const exportLink = `${window.location.origin}${window.location.pathname}?${exportParams.toString()}`;
+  const base = parts.length ? parts.join(" | ") : "Rapport de recherche";
+  if (!stats) return `${base}\nLien export: ${exportLink}`;
+  return `${base}
+Observations: ${stats.kpis?.observations ?? 0}
+Especes: ${stats.kpis?.species ?? 0}
+Sites: ${stats.kpis?.sites ?? 0}
+Zones: ${stats.kpis?.zones ?? 0}
+Lien export: ${exportLink}`;
+}
+$("btnRunEvolution").addEventListener("click", async () => {
+  $("evoStats").textContent = "";
+  try {
+    const res = await apiGet("observations/evolution", {
+      date_from: $("evoDateFrom").value || "",
+      date_to: $("evoDateTo").value || "",
+      zone: $("searchZone").value,
+      site: $("searchSite").value
+    });
+    const pct = res.change.pct == null ? "n/a" : res.change.pct + "%";
+    $("evoStats").textContent = `Actuel: ${res.current.total} | Precedent: ${res.previous.total} | Delta: ${res.change.delta} | %: ${pct}`;
+    const labels = Array.from(new Set([...(res.series || []).map(x => x.label), ...(res.series_prev || []).map(x => x.label)])).sort();
+    const curMap = Object.fromEntries((res.series || []).map(x => [x.label, x.value]));
+    const prevMap = Object.fromEntries((res.series_prev || []).map(x => [x.label, x.value]));
+    const curValues = labels.map(l => curMap[l] || 0);
+    const prevValues = labels.map(l => prevMap[l] || 0);
+    evoChart?.destroy();
+    evoChart = new Chart($("evoChart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Actuel", data: curValues, borderColor: "#6aa6ff", tension: 0.25 },
+          { label: "Precedent", data: prevValues, borderColor: "#f6c177", tension: 0.25 }
+        ]
+      },
+      options: { responsive: true }
+    });
+  } catch (err) {
+    $("evoStats").textContent = "Erreur evolution";
+  }
+});
+
+// Messaging
+async function loadUsers() {
+  const res = await apiGet("messages/users");
+  state.users = res.items || [];
+  updateShareUsers(state.users);
+  const list = $("userList");
+  list.innerHTML = "";
+  (res.items || []).forEach(user => {
+    if (user.is_self) return;
+    const div = document.createElement("div");
+    div.className = "userItem";
+    div.dataset.userId = user.id;
+    div.textContent = `${user.full_name} (${user.role})`;
+    div.addEventListener("click", () => selectUser(user));
+    list.appendChild(div);
+  });
+}
+
+function selectUser(user) {
+  $$(".userItem").forEach(el => el.classList.toggle("active", Number(el.dataset.userId) === user.id));
+  state.chat.withUserId = user.id;
+  state.chat.lastId = 0;
+  clearAttachment();
+  $("chatMessages").innerHTML = "";
+  if (state.chat.source) {
+    state.chat.source.close();
+  }
+  loadMessages(user.id);
+  startStream(user.id);
+}
+
+async function loadMessages(withUserId) {
+  const res = await apiGet("messages/list", { with_user_id: withUserId, limit: 200 });
+  res.items.forEach(addMessage);
+}
+
+function addMessage(msg) {
+  const wrap = $("chatMessages");
+  const div = document.createElement("div");
+  div.className = "msg " + (msg.sender_id === state.user.id ? "me" : "other");
+  const safeBody = escapeHtml(msg.body || "");
+  const attachments = (msg.attachments || [])
+    .map(att => {
+      const name = escapeHtml(att.file_name || "piece_jointe");
+      const size = formatBytes(Number(att.file_size || 0));
+      const href = escapeHtml(att.file_url || att.file_path || "#");
+      return `<a class="attachLink" href="${href}" target="_blank" rel="noopener">${name} <span class="small">(${size})</span></a>`;
+    })
+    .join("");
+  const bodyBlock = safeBody ? `<div class="bubble">${safeBody}</div>` : "";
+  const attachBlock = attachments ? `<div class="attachments">${attachments}</div>` : "";
+  div.innerHTML = `
+    <div class="meta">${msg.sender_name || ""} - ${msg.created_at || ""}</div>
+    ${bodyBlock}
+    ${attachBlock}
+  `;
+  wrap.appendChild(div);
+  state.chat.lastId = Math.max(state.chat.lastId, Number(msg.id || 0));
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+function startStream(withUserId) {
+  const params = new URLSearchParams({
+    route: "messages/stream",
+    with_user_id: withUserId,
+    since_id: state.chat.lastId
+  });
+  const source = new EventSource(API_BASE + "?" + params.toString());
+  state.chat.source = source;
+  source.onmessage = (event) => {
+    if (!event.data) return;
+    try {
+      const msg = JSON.parse(event.data);
+      addMessage(msg);
+    } catch {}
+  };
+  source.onerror = () => {
+    source.close();
+    setTimeout(() => {
+      if (state.chat.withUserId) startStream(state.chat.withUserId);
+    }, 2000);
+  };
+}
+
+$("btnSendMsg").addEventListener("click", async () => {
+  const body = $("chatInput").value.trim();
+  if (!state.chat.withUserId) return;
+  if (!body && !state.chat.attachment) return;
+  $("chatInput").value = "";
+  let res;
+  if (state.chat.attachment) {
+    const formData = new FormData();
+    formData.append("recipient_id", state.chat.withUserId);
+    formData.append("body", body);
+    formData.append("attachment", state.chat.attachment);
+    res = await apiPostForm("messages/send", formData);
+    clearAttachment();
+  } else {
+    res = await apiPost("messages/send", {
+      recipient_id: state.chat.withUserId,
+      body
+    });
+  }
+  addMessage(res);
+});
+
+function setAttachment(file) {
+  state.chat.attachment = file;
+  $("chatAttachmentName").textContent = file ? file.name : "";
+  $("chatAttachment").classList.toggle("hidden", !file);
+}
+
+function clearAttachment() {
+  state.chat.attachment = null;
+  if ($("chatFile")) $("chatFile").value = "";
+  $("chatAttachment").classList.add("hidden");
+  $("chatAttachmentName").textContent = "";
+}
+
+$("btnAttach").addEventListener("click", () => {
+  $("chatFile").click();
+});
+
+$("chatFile").addEventListener("change", () => {
+  const file = $("chatFile").files && $("chatFile").files[0];
+  if (!file) {
+    clearAttachment();
+    return;
+  }
+  setAttachment(file);
+});
+
+$("chatAttachmentClear").addEventListener("click", () => {
+  clearAttachment();
+});
+
+// Profile
+$("btnUpdateProfile").addEventListener("click", async () => {
+  $("profileStatus").textContent = "";
+  try {
+    const first = $("profileFirstName").value.trim();
+    const last = $("profileLastName").value.trim();
+    const fullName = [first, last].filter(Boolean).join(" ").trim();
+    const email = $("profileEmail").value.trim();
+    const phone = $("profilePhone").value.trim();
+    const payload = { phone };
+    if (fullName) payload.full_name = fullName;
+    if (email) payload.email = email;
+    const res = await apiPost("profile/update", payload);
+    state.user = res.user;
+    saveProfileExtras({
+      org: $("profileOrg").value.trim(),
+      bio: $("profileBio").value.trim()
+    });
+    saveProfilePrefs(collectProfilePrefs());
+    applyTheme(loadProfilePrefs());
+    applyPrefsUI(loadProfilePrefs());
+    renderUserInfo();
+    $("profileStatus").textContent = "Profil mis a jour.";
+  } catch (err) {
+    $("profileStatus").textContent = "Erreur mise a jour.";
+  }
+});
+
+$("btnProfileCancel").addEventListener("click", () => {
+  applyProfileFields();
+  $("profileStatus").textContent = "Modifications annulees.";
+});
+
+$("btnUpdatePassword").addEventListener("click", async () => {
+  $("passwordStatus").textContent = "";
+  const password = $("profilePassword").value;
+  if (!password) {
+    $("passwordStatus").textContent = "Mot de passe requis.";
+    return;
+  }
+  try {
+    const res = await apiPost("profile/update", { password });
+    state.user = res.user;
+    $("profilePassword").value = "";
+    $("passwordStatus").textContent = "Mot de passe mis a jour.";
+  } catch (err) {
+    $("passwordStatus").textContent = "Erreur mise a jour.";
+  }
+});
+
+$("btnPasswordClear").addEventListener("click", () => {
+  $("profilePassword").value = "";
+  $("passwordStatus").textContent = "";
+});
+
+if ($("prefDarkMode")) {
+  $("prefDarkMode").addEventListener("change", () => {
+    const isDark = $("prefDarkMode").checked;
+    saveProfilePrefs({ darkMode: isDark, theme: isDark ? "dark" : "light" });
+    const prefs = loadProfilePrefs();
+    applyTheme(prefs);
+    applyPrefsUI(prefs);
+  });
+}
+
+if ($("prefPush")) {
+  $("prefPush").addEventListener("change", () => {
+    saveProfilePrefs({ push: $("prefPush").checked });
+  });
+}
+
+$$(".segmented button[data-lang]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $$(".segmented button[data-lang]").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    saveProfilePrefs({ language: btn.dataset.lang });
+  });
+});
+
+$$(".themeCard").forEach(card => {
+  card.addEventListener("click", () => {
+    $$(".themeCard").forEach(c => c.classList.remove("active"));
+    card.classList.add("active");
+    const theme = card.dataset.theme;
+    saveProfilePrefs({ theme, darkMode: theme === "dark" });
+    const prefs = loadProfilePrefs();
+    applyTheme(prefs);
+    applyPrefsUI(prefs);
+  });
+});
+
+updatePageMeta(state.tab);
+const initialPrefs = loadProfilePrefs();
+applyTheme(initialPrefs);
+applyPrefsUI(initialPrefs);
+checkAuth();
+</script>
+</body>
+</html>

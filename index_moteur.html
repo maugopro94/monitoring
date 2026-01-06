@@ -80,6 +80,9 @@
     .maplibregl-popup-close-button{color:var(--muted)}
     .popupTitle{font-weight:900;margin-bottom:4px}
     .popupRow{font-size:12px;color:var(--muted);margin:2px 0}
+    .popupActions{display:flex;gap:8px;margin-top:8px}
+    .popupBtn{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(106,166,255,.16);color:var(--text);cursor:pointer;font-size:11px;font-weight:700}
+    .rowClickable td{cursor:pointer}
     .notice{padding:14px}
     .notice b{color:var(--text)}
   </style>
@@ -216,6 +219,10 @@
               <canvas id="chartTopSites"></canvas>
             </div>
             <div class="chartCard">
+              <h3>Top zones</h3>
+              <canvas id="chartZones"></canvas>
+            </div>
+            <div class="chartCard">
               <h3>Répartition par famille</h3>
               <canvas id="chartFamilies"></canvas>
             </div>
@@ -233,10 +240,19 @@ const DEMO_MODE = false; // ✅ demandé
 const API_BASE = "api.php"; // ✅ demandé
 const NET_LABEL = DEMO_MODE ? "Mode démo" : "API";
 
+const SITE_COORDS_URL = "data/zone_coords.json";
+const SITE_COLORS = ["#4DD0E1","#26A69A","#66BB6A","#DCE775","#FFCA28","#FFA726","#FF7043","#EF5350","#EC407A","#AB47BC","#5C6BC0","#42A5F5"];
+const CHART_COLORS = ["#4DD0E1","#66BB6A","#FFCA28","#FF7043","#EF5350","#5C6BC0","#26A69A","#FFA726","#EC407A","#42A5F5"];
+const CHART_LINE = "#6aa6ff";
+
 /** State / Helpers **/
 const $ = (id) => document.getElementById(id);
 
 const state = { tab:"mapView", page:1, page_size:25, filters:{}, requestId:0, loading:false };
+let siteCoords = {};
+let siteCoordIndex = {};
+let siteGeojson = null;
+let zoneNames = new Set();
 
 function setTab(tabId){
   state.tab = tabId;
@@ -249,6 +265,177 @@ function escapeHtml(s){
   return String(s ?? "").replace(/[&<>"']/g, c => ({
     "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
   }[c]));
+}
+
+function hashString(str){
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
+}
+
+function normalizeKey(value){
+  let v = String(value ?? "").trim();
+  if (!v) return "";
+  if (typeof v.normalize === "function") {
+    v = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  v = v.toUpperCase().replace(/\s+/g, " ").trim();
+  return v;
+}
+
+function buildSiteCoordIndex(coords){
+  const index = {};
+  Object.entries(coords || {}).forEach(([name, coord]) => {
+    index[name] = coord;
+    const norm = normalizeKey(name);
+    if (norm) index[norm] = coord;
+  });
+  const special = {
+    TECHNOPOLE: ["TECHNOPOLE", "TECHNOPOLE DAKAR", "TECHNOPOLE DE DAKAR"],
+    MBEUBEUSS: ["MBEUBEUSS", "LAC MBEUBEUSS"]
+  };
+  Object.entries(special).forEach(([key, aliases]) => {
+    const found = aliases.map(a => index[a] || index[normalizeKey(a)]).find(Boolean);
+    if (found) {
+      index[key] = found;
+      aliases.forEach(a => {
+        index[a] = found;
+        const norm = normalizeKey(a);
+        if (norm) index[norm] = found;
+      });
+    }
+  });
+  return index;
+}
+
+function resolveSiteCoords(name){
+  if (!name) return null;
+  const direct = siteCoordIndex[name];
+  if (direct) return direct;
+  const norm = normalizeKey(name);
+  if (siteCoordIndex[norm]) return siteCoordIndex[norm];
+  if (norm.includes("TECHNOPOLE") && siteCoordIndex.TECHNOPOLE) return siteCoordIndex.TECHNOPOLE;
+  if (norm.includes("MBEUBEUSS") && siteCoordIndex.MBEUBEUSS) return siteCoordIndex.MBEUBEUSS;
+  return null;
+}
+
+function colorFromName(name){
+  const idx = Math.abs(hashString(name)) % SITE_COLORS.length;
+  return SITE_COLORS[idx];
+}
+
+function buildPalette(count){
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    colors.push(CHART_COLORS[i % CHART_COLORS.length]);
+  }
+  return colors;
+}
+
+function buildSiteGeojson(coords){
+  const features = [];
+  const names = Object.keys(coords || {});
+  for (const name of names) {
+    const c = coords[name];
+    const lat = Number(c && c.lat);
+    const lon = Number(c && c.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    features.push({
+      type:"Feature",
+      properties:{ site:name, site_norm:normalizeKey(name), color:colorFromName(name), lat, lon },
+      geometry:{ type:"Point", coordinates:[lon, lat] }
+    });
+  }
+  return { type:"FeatureCollection", features };
+}
+
+function populateSiteOptions(names){
+  const select = $("site");
+  const current = select.value;
+  select.innerHTML = "<option value=''>Tous</option>";
+  const sorted = [...names].sort((a,b)=>a.localeCompare(b));
+  for (const s of sorted){
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    select.appendChild(opt);
+  }
+  if (current && sorted.includes(current)) {
+    select.value = current;
+  }
+}
+
+function ensureSelectOption(select, value){
+  if (!value) return;
+  const exists = Array.from(select.options).some(opt => opt.value === value);
+  if (!exists) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    select.appendChild(opt);
+  }
+}
+
+function applyZoneFilter(zone, targetTab="tableView"){
+  if (!zone) return;
+  const zoneSelect = $("zone");
+  ensureSelectOption(zoneSelect, zone);
+  zoneSelect.value = zone;
+  zoneSelect.dispatchEvent(new Event("change"));
+  $("site").value = "";
+  updateSelectedSiteLayer("");
+  setTab(targetTab);
+  runSearch();
+}
+
+function applySiteFilter(site, targetTab="tableView"){
+  if (!site) return;
+  const siteSelect = $("site");
+  ensureSelectOption(siteSelect, site);
+  siteSelect.value = site;
+  $("zone").value = "";
+  updateSelectedSiteLayer(site);
+  setTab(targetTab);
+  runSearch();
+  if (targetTab === "mapView") {
+    focusSelectedSite(site);
+  }
+}
+
+function createPopupContent(title, rows, actions){
+  const wrap = document.createElement("div");
+  const t = document.createElement("div");
+  t.className = "popupTitle";
+  t.textContent = title;
+  wrap.appendChild(t);
+  rows.forEach(({ label, value }) => {
+    const row = document.createElement("div");
+    row.className = "popupRow";
+    row.textContent = `${label} : ${value ?? ""}`;
+    wrap.appendChild(row);
+  });
+  if (Array.isArray(actions) && actions.length) {
+    const actionWrap = document.createElement("div");
+    actionWrap.className = "popupActions";
+    actions.forEach(({ label, onClick })=>{
+      if (!label || typeof onClick !== "function") return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "popupBtn";
+      btn.textContent = label;
+      btn.addEventListener("click", (e)=>{
+        e.stopPropagation();
+        onClick();
+      });
+      actionWrap.appendChild(btn);
+    });
+    if (actionWrap.childNodes.length) {
+      wrap.appendChild(actionWrap);
+    }
+  }
+  return wrap;
 }
 
 function setNetStatus(mode, text){
@@ -363,6 +550,12 @@ async function fetchGeo(useBbox=false){
   return apiGetWithFilters("observations/geo", extra);
 }
 
+async function fetchSiteCoords(){
+  const data = await safeFetchJson(SITE_COORDS_URL);
+  siteCoordIndex = buildSiteCoordIndex(data || {});
+  return data || {};
+}
+
 function shouldUseBboxForGeo(){
   return !(state.filters && state.filters.site);
 }
@@ -390,6 +583,9 @@ function renderTable(data){
   } else {
     items.forEach(row => {
       const tr = document.createElement("tr");
+      tr.classList.add("rowClickable");
+      tr.dataset.site = row.site ?? "";
+      tr.dataset.zone = row.zone ?? "";
       tr.innerHTML = `
         <td>${escapeHtml(row.date ?? "")}<div class="small">#${escapeHtml(row.doc_id ?? "")}</div></td>
         <td>${escapeHtml(row.title ?? "")}</td>
@@ -398,6 +594,15 @@ function renderTable(data){
         <td>${escapeHtml(row.site ?? "")}</td>
         <td>${escapeHtml(row.effectif ?? "")}</td>
       `;
+      tr.addEventListener("click", ()=>{
+        const site = tr.dataset.site || "";
+        const zone = tr.dataset.zone || "";
+        if (site) {
+          applySiteFilter(site, "mapView");
+        } else if (zone) {
+          applyZoneFilter(zone, "mapView");
+        }
+      });
       body.appendChild(tr);
     });
   }
@@ -411,7 +616,7 @@ function renderTable(data){
 }
 
 /** Charts **/
-let chartTime, chartTopSpecies, chartTopSites, chartFamilies;
+let chartTime, chartTopSpecies, chartTopSites, chartZones, chartFamilies;
 function renderCharts(stats){
   updateKpis(stats.kpis || {});
   const timeLabels = (stats.time || []).map(x => x.label);
@@ -419,7 +624,15 @@ function renderCharts(stats){
 
   chartTime?.destroy();
   chartTime = new Chart($("chartTime"), { type:"line",
-    data:{ labels:timeLabels, datasets:[{ label:"Observations", data:timeValues }] },
+    data:{ labels:timeLabels, datasets:[{
+      label:"Observations",
+      data:timeValues,
+      borderColor:CHART_LINE,
+      backgroundColor:"rgba(106,166,255,0.22)",
+      pointRadius:2,
+      tension:0.25,
+      fill:true
+    }] },
     options:{ responsive:true, plugins:{ legend:{ display:false } } }
   });
 
@@ -427,7 +640,13 @@ function renderCharts(stats){
   const spValues = (stats.top_species || []).map(x => x.value);
   chartTopSpecies?.destroy();
   chartTopSpecies = new Chart($("chartTopSpecies"), { type:"bar",
-    data:{ labels:spLabels, datasets:[{ label:"Occurences", data:spValues }] },
+    data:{ labels:spLabels, datasets:[{
+      label:"Occurences",
+      data:spValues,
+      backgroundColor:buildPalette(spLabels.length),
+      borderColor:"#0b1020",
+      borderWidth:1
+    }] },
     options:{ responsive:true, plugins:{ legend:{ display:false } } }
   });
 
@@ -435,15 +654,56 @@ function renderCharts(stats){
   const siteValues = (stats.top_sites || []).map(x => x.value);
   chartTopSites?.destroy();
   chartTopSites = new Chart($("chartTopSites"), { type:"bar",
-    data:{ labels:siteLabels, datasets:[{ label:"Observations", data:siteValues }] },
+    data:{ labels:siteLabels, datasets:[{
+      label:"Observations",
+      data:siteValues,
+      backgroundColor:buildPalette(siteLabels.length),
+      borderColor:"#0b1020",
+      borderWidth:1
+    }] },
     options:{ responsive:true, plugins:{ legend:{ display:false } } }
   });
+  chartTopSites.options.onClick = (event, elements)=>{
+    if (!elements || !elements.length) return;
+    const idx = elements[0].index;
+    const label = chartTopSites.data.labels[idx];
+    applySiteFilter(label, "mapView");
+  };
+  if (chartTopSites.canvas) chartTopSites.canvas.style.cursor = "pointer";
+  chartTopSites.update();
+
+  const zoneLabels = (stats.zones || []).map(x => x.label);
+  const zoneValues = (stats.zones || []).map(x => x.value);
+  chartZones?.destroy();
+  chartZones = new Chart($("chartZones"), { type:"bar",
+    data:{ labels:zoneLabels, datasets:[{
+      label:"Observations",
+      data:zoneValues,
+      backgroundColor:buildPalette(zoneLabels.length),
+      borderColor:"#0b1020",
+      borderWidth:1
+    }] },
+    options:{ responsive:true, plugins:{ legend:{ display:false } } }
+  });
+  chartZones.options.onClick = (event, elements)=>{
+    if (!elements || !elements.length) return;
+    const idx = elements[0].index;
+    const label = chartZones.data.labels[idx];
+    applyZoneFilter(label, "tableView");
+  };
+  if (chartZones.canvas) chartZones.canvas.style.cursor = "pointer";
+  chartZones.update();
 
   const famLabels = (stats.families || []).map(x => x.label);
   const famValues = (stats.families || []).map(x => x.value);
   chartFamilies?.destroy();
   chartFamilies = new Chart($("chartFamilies"), { type:"doughnut",
-    data:{ labels:famLabels, datasets:[{ data:famValues }] },
+    data:{ labels:famLabels, datasets:[{
+      data:famValues,
+      backgroundColor:buildPalette(famLabels.length),
+      borderColor:"#0b1020",
+      borderWidth:1
+    }] },
     options:{ responsive:true, plugins:{ legend:{ position:"bottom" } } }
   });
 }
@@ -454,6 +714,7 @@ let popup = null;
 
 const mapStyle = {
   version:8,
+  glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
   sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap contributors" } },
   layers:[{ id:"osm", type:"raster", source:"osm" }]
 };
@@ -485,16 +746,24 @@ function addOrUpdateSource(geojson){
     map.on("click","unclustered-point",(e)=>{
       const f = e.features[0];
       const p = f.properties;
-      const html = `
-        <div class="popupTitle">${escapeHtml(p.title ?? "Observation")}</div>
-        <div class="popupRow">Zone : ${escapeHtml(p.zone ?? "")}</div>
-        <div class="popupRow">Site : ${escapeHtml(p.site ?? "")}</div>
-        <div class="popupRow">Famille : ${escapeHtml(p.famille ?? "")}</div>
-        <div class="popupRow">Date : ${escapeHtml(p.date ?? "")}</div>
-        <div class="popupRow">Effectif : ${escapeHtml(p.effectif ?? "")}</div>
-      `;
+      const zone = p.zone ?? "";
+      const actions = zone ? [
+        { label:"Tableau (zone)", onClick:()=>applyZoneFilter(zone, "tableView") },
+        { label:"Stats (zone)", onClick:()=>applyZoneFilter(zone, "statsView") }
+      ] : [];
+      const content = createPopupContent(
+        p.title ?? "Observation",
+        [
+          { label:"Zone", value:p.zone ?? "" },
+          { label:"Site", value:p.site ?? "" },
+          { label:"Famille", value:p.famille ?? "" },
+          { label:"Date", value:p.date ?? "" },
+          { label:"Effectif", value:p.effectif ?? "" }
+        ],
+        actions
+      );
       popup?.remove();
-      popup = new maplibregl.Popup({ closeButton:true }).setLngLat(f.geometry.coordinates).setHTML(html).addTo(map);
+      popup = new maplibregl.Popup({ closeButton:true }).setLngLat(f.geometry.coordinates).setDOMContent(content).addTo(map);
     });
 
     map.on("mouseenter","clusters",()=>map.getCanvas().style.cursor="pointer");
@@ -504,6 +773,111 @@ function addOrUpdateSource(geojson){
   } else {
     map.getSource("obs").setData(geojson);
   }
+}
+
+function addOrUpdateSiteSource(geojson){
+  if (!map) return;
+  if (!map.getSource("sites")){
+    map.addSource("sites", { type:"geojson", data:geojson });
+    map.addLayer({
+      id:"site-points",
+      type:"circle",
+      source:"sites",
+      paint:{
+        "circle-radius":6,
+        "circle-color":["get","color"],
+        "circle-opacity":0.95,
+        "circle-stroke-width":1.5,
+        "circle-stroke-color":"#f7f8ff"
+      }
+    });
+    map.addLayer({
+      id:"site-selected",
+      type:"circle",
+      source:"sites",
+      filter:["==", ["get","site_norm"], "__none__"],
+      paint:{
+        "circle-radius":10,
+        "circle-color":["get","color"],
+        "circle-opacity":1,
+        "circle-stroke-width":3,
+        "circle-stroke-color":"#ffffff"
+      }
+    });
+    map.addLayer({
+      id:"site-labels",
+      type:"symbol",
+      source:"sites",
+      minzoom:6,
+      layout:{
+        "text-field":["get","site"],
+        "text-size":12,
+        "text-offset":[0,1.1],
+        "text-anchor":"top",
+        "text-allow-overlap":false
+      },
+      paint:{
+        "text-color":"#f7f8ff",
+        "text-halo-color":"#0b1020",
+        "text-halo-width":1.4,
+        "text-halo-blur":0.4
+      }
+    });
+
+    map.on("click","site-points",(e)=>{
+      const f = e.features && e.features[0];
+      if (!f) return;
+      const p = f.properties || {};
+      const siteName = p.site ?? "";
+      const isZone = siteName && zoneNames.has(siteName);
+      const actions = siteName ? [
+        {
+          label: isZone ? "Tableau (zone)" : "Tableau (site)",
+          onClick: ()=> (isZone ? applyZoneFilter(siteName, "tableView") : applySiteFilter(siteName, "tableView"))
+        },
+        {
+          label: isZone ? "Stats (zone)" : "Stats (site)",
+          onClick: ()=> (isZone ? applyZoneFilter(siteName, "statsView") : applySiteFilter(siteName, "statsView"))
+        }
+      ] : [];
+      const content = createPopupContent(
+        siteName || "Site",
+        [
+          { label:"Lat", value:p.lat ?? "" },
+          { label:"Lon", value:p.lon ?? "" }
+        ],
+        actions
+      );
+      popup?.remove();
+      popup = new maplibregl.Popup({ closeButton:true }).setLngLat(f.geometry.coordinates).setDOMContent(content).addTo(map);
+    });
+    map.on("mouseenter","site-points",()=>map.getCanvas().style.cursor="pointer");
+    map.on("mouseleave","site-points",()=>map.getCanvas().style.cursor="");
+  } else {
+    map.getSource("sites").setData(geojson);
+  }
+}
+
+function updateSelectedSiteLayer(siteName){
+  if (!map || (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded())) return;
+  if (!map.getLayer("site-selected")) return;
+  const key = normalizeKey(siteName);
+  if (key) {
+    map.setFilter("site-selected", ["==", ["get","site_norm"], key]);
+  } else {
+    map.setFilter("site-selected", ["==", ["get","site_norm"], "__none__"]);
+  }
+}
+
+function focusSelectedSite(siteName){
+  if (!map || (typeof map.isStyleLoaded === "function" && !map.isStyleLoaded())) return false;
+  const coord = resolveSiteCoords(siteName);
+  if (!coord) return false;
+  const lat = Number(coord.lat);
+  const lon = Number(coord.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  map.easeTo({ center:[lon, lat], zoom:11 });
+  return true;
 }
 
 function fitMapToGeojson(geojson){
@@ -563,6 +937,10 @@ async function initMap(){
       console.error(err);
       setNetStatus("error", "Erreur carte");
     }
+    if (siteGeojson) {
+      addOrUpdateSiteSource(siteGeojson);
+      updateSelectedSiteLayer($("site").value);
+    }
   });
 
   map.on("moveend", debounce(async ()=>{
@@ -582,6 +960,7 @@ async function initMap(){
 async function runSearch(){
   const requestId = ++state.requestId;
   state.filters = collectFilters();
+  updateSelectedSiteLayer(state.filters.site);
   state.page = 1;
   setLoading(true);
   setNetStatus("loading", "Chargement...");
@@ -618,7 +997,8 @@ async function runSearch(){
       if (geojson && requestId === state.requestId) {
         addOrUpdateSource(geojson);
         if (state.filters.site) {
-          fitMapToGeojson(geojson);
+          const focused = focusSelectedSite(state.filters.site);
+          if (!focused) fitMapToGeojson(geojson);
         }
       }
     }
@@ -683,19 +1063,35 @@ function resetFilters(){
   });
 
   // Populate filters
+  let hasSiteCoords = false;
+  try {
+    siteCoords = await fetchSiteCoords();
+    siteGeojson = buildSiteGeojson(siteCoords);
+    const siteNames = Object.keys(siteCoords || {});
+    if (siteNames.length) {
+      populateSiteOptions(siteNames);
+      hasSiteCoords = true;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
   try {
     const zones = await fetchZones();
+    zoneNames = new Set(zones);
     for (const z of zones){
       const opt = document.createElement("option");
       opt.value = z; opt.textContent = z;
       $("zone").appendChild(opt);
     }
 
-    const sites = await fetchSites("");
-    for (const s of sites){
-      const opt = document.createElement("option");
-      opt.value = s; opt.textContent = s;
-      $("site").appendChild(opt);
+    if (!hasSiteCoords) {
+      const sites = await fetchSites("");
+      for (const s of sites){
+        const opt = document.createElement("option");
+        opt.value = s; opt.textContent = s;
+        $("site").appendChild(opt);
+      }
     }
   } catch (err) {
     console.error(err);
@@ -704,6 +1100,7 @@ function resetFilters(){
 
   $("zone").addEventListener("change", async ()=>{
     const z = $("zone").value;
+    if (siteCoords && Object.keys(siteCoords).length) return;
     $("site").innerHTML = "<option value=''>Tous</option>";
     try {
       const sitesZ = await fetchSites(z);
@@ -719,6 +1116,8 @@ function resetFilters(){
   });
 
   $("site").addEventListener("change", ()=>{
+    updateSelectedSiteLayer($("site").value);
+    focusSelectedSite($("site").value);
     runSearch();
   });
 

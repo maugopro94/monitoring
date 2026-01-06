@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Monitoring - Accueil</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+:root{
+  --bg:#f7f4ef;
+  --panel:#ffffff;
+  --text:#1e293b;
+  --muted:#64748b;
+  --accent:#1d4ed8;
+  --accent2:#0ea5e9;
+  --border:#e2e8f0;
+  --shadow:0 16px 40px rgba(15,23,42,.12);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Sora",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+.hero{min-height:100vh;display:grid;place-items:center;padding:48px}
+.heroWrap{max-width:1100px;width:100%;display:grid;gap:24px}
+.header{display:flex;flex-direction:column;gap:10px}
+.kicker{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.title{font-size:40px;line-height:1.1;font-weight:700;max-width:720px}
+.subtitle{font-size:16px;color:var(--muted);max-width:680px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card.clickable{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease}
+.card.clickable:hover{transform:translateY(-2px);box-shadow:0 20px 46px rgba(15,23,42,.16)}
+.card::after{content:"";position:absolute;inset:auto -30% -60% -30%;height:220px;background:radial-gradient(circle at 20% 30%,rgba(14,165,233,.15),transparent 60%)}
+.cardTitle{font-size:20px;font-weight:700;margin:0 0 8px}
+.cardDesc{color:var(--muted);font-size:14px;margin:0 0 18px}
+.tag{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;color:#334155;font-size:11px;padding:6px 10px;border-radius:999px;margin-bottom:10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid transparent;background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;font-weight:600;text-decoration:none}
+.btn.secondary{background:#fff;color:var(--text);border-color:var(--border)}
+.footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
+.blob{position:absolute;top:-90px;right:-90px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#60a5fa,#22d3ee);opacity:.25}
+@media (max-width:720px){
+  .title{font-size:32px}
+  .hero{padding:32px}
+}
+  </style>
+</head>
+<body>
+  <main class="hero">
+    <div class="heroWrap">
+      <div class="header">
+        <div class="kicker">Monitoring</div>
+        <div class="title">Plateforme de suivi des observations et analyses</div>
+        <div class="subtitle">Choisissez votre espace pour consulter la carte, analyser les tendances, ou saisir des observations.</div>
+      </div>
+
+      <div class="cards">
+        <section class="card clickable" data-href="index_moteur.html" role="link" tabindex="0">
+          <div class="blob"></div>
+          <div class="tag">Espace visiteur</div>
+          <h2 class="cardTitle">Carte & statistiques</h2>
+          <p class="cardDesc">Acces rapide aux observations, filtres, tableau et statistiques publiques.</p>
+          <div class="actions">
+            <a class="btn" href="index_moteur.html">Acceder a la carte</a>
+            <a class="btn secondary" href="index_moteur.html#stats">Voir les statistiques</a>
+          </div>
+        </section>
+
+        <section class="card clickable" data-href="charge_suivi.html" role="link" tabindex="0">
+          <div class="blob"></div>
+          <div class="tag">Espace charge de suivi</div>
+          <h2 class="cardTitle">Saisie & validation</h2>
+          <p class="cardDesc">Soumission d observations, messagerie interne, rapports et suivi des validations.</p>
+          <div class="actions">
+            <a class="btn" href="charge_suivi.html">Acceder a l espace</a>
+            <a class="btn secondary" href="charge_suivi.html#submitView">Nouvelle observation</a>
+          </div>
+        </section>
+      </div>
+
+      <div class="footer">
+        <div>Monitoring - Observations</div>
+        <div>Version locale</div>
+      </div>
+    </div>
+  </main>
+  <script>
+    document.querySelectorAll(".card.clickable").forEach(card => {
+      const href = card.dataset.href;
+      if (!href) return;
+      const go = () => { window.location.href = href; };
+      card.addEventListener("click", (event) => {
+        if (event.target.closest("a")) return;
+        go();
+      });
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          go();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -36,8 +36,35 @@ index_moteur.html -> api.php?route=... -> functions_monitoring_api.php -> MySQL
 4. Verifier la presence de `data/zone_coords.json`.
 
 ## Lancer l'application
-Ouvrir `http://localhost/monitoring/index_moteur.html`.
+Ouvrir `http://localhost/monitoring/index.html`.
+Choisir l'espace visiteur ou charge de suivi.
+
+Acces direct visiteur: `http://localhost/monitoring/index_moteur.html`.
 Si WebGL est indisponible, l'onglet Carte est masque; utiliser Tableau/Stats.
+
+## Espace Charge de suivi
+Ouvrir `http://localhost/monitoring/charge_suivi.html`.
+
+Profil "Charge de suivi" (role `charge_suivi`) - privileges principaux:
+- Authentification: inscription + connexion.
+- Soumission d'observations (formulaire inspire de `birds`) vers `observation_pending`.
+- Suivi de ses soumissions (etat: pending/approved/rejected).
+- Recherche et export PDF (impression) des resultats filtres.
+- Rapport: carte + statistiques apres recherche.
+- Partage des resultats par messagerie interne.
+- Messagerie temps reel (SSE) + pieces jointes.
+- Edition du profil (nom/email/telephone) et preferences UI.
+- Evolution statistique (comparaison de periodes).
+
+Roles associes:
+- `charge_suivi`: soumettre + consulter + partager.
+- `controleur`: valider/rejeter les observations en attente.
+- `admin`: meme droits que controleur + gestion de roles lors inscription.
+
+Flux de validation:
+```
+charge_suivi -> observation_pending -> validation (controleur/admin) -> birds
+```
 
 ## API (routes et parametres)
 Base: `api.php?route=...`
@@ -69,6 +96,10 @@ Filtres supportes:
 - `zone`: liste de zones.
 - `search_observations_view`: vue derivee de `birds`, utilisee si presente.
 - `search_index`: present dans le dump, non utilise par l'API actuelle.
+- `users`: comptes + roles (`charge_suivi`, `controleur`, `admin`).
+- `observation_pending`: observations en attente de validation.
+- `messages`: messagerie interne.
+- `message_attachments`: fichiers lies aux messages (stockes sous `uploads/messages/`).
 
 ## Maintenance / mises a jour futures
 - Ajouter un filtre:

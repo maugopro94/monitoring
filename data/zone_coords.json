@@ -26,6 +26,7 @@
   "KAGNOUTE": { "lat": 12.55, "lon": -16.62 },
   "KALISSAYE": { "lat": 12.67, "lon": -16.75 },
   "LAC MBEUBEUSS": { "lat": 14.81, "lon": -17.30 },
+  "MBEUBEUSS": { "lat": 14.81, "lon": -17.30 },
   "LAC ROSE": { "lat": 14.83, "lon": -17.23 },
   "NIANING": { "lat": 14.34, "lon": -16.93 },
   "OUSSOUYE": { "lat": 12.49, "lon": -16.54 },
@@ -33,7 +34,7 @@
   "POINTE SARENE": { "lat": 14.35, "lon": -17.05 },
   "SOMONE": { "lat": 14.49, "lon": -17.07 },
   "THIONK ESSYLO": { "lat": 12.79, "lon": -16.52 },
-  "TECHNOPOLE": { "lat": 14.75106, "lon": -17.4113 },
+  "TECHNOPÔLE": { "lat": 14.75106, "lon": -17.4113 },
   "TOUBA DIALAO": { "lat": 14.61, "lon": -17.15 },
   "YENE": { "lat": 14.64, "lon": -17.17 }
 }

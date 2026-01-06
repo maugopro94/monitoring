@@ -9,7 +9,7 @@ require_once __DIR__ . '/functions_monitoring_api.php';
 
 // Allow CORS for local development.  You may restrict this in production.
 header('Access-Control-Allow-Origin: *');
-header('Content-Type: application/json; charset=utf-8');
+session_start();
 
 // Read the route parameter from the query string.  Default to empty string.
 $route = isset($_GET['route']) ? trim($_GET['route']) : '';
@@ -17,6 +17,12 @@ $route = isset($_GET['route']) ? trim($_GET['route']) : '';
 // Collect all parameters except `route` into $params for the helper functions.
 $params = $_GET;
 unset($params['route']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = read_body_params();
+    if ($body) {
+        $params = array_merge($params, $body);
+    }
+}
 
 // Dispatch based on route.  Supported routes:
 //   - observations            : paginated list of observations
@@ -27,44 +33,186 @@ unset($params['route']);
 try {
     switch ($route) {
         case 'observations':
+            header('Content-Type: application/json; charset=utf-8');
             $result = q_observations($params);
             echo json_encode($result, JSON_UNESCAPED_UNICODE);
             break;
         case 'observations/geo':
+            header('Content-Type: application/json; charset=utf-8');
             $result = q_geo($params);
             echo json_encode($result, JSON_UNESCAPED_UNICODE);
             break;
         case 'observations/stats':
+            header('Content-Type: application/json; charset=utf-8');
             $result = q_stats($params);
             echo json_encode($result, JSON_UNESCAPED_UNICODE);
             break;
+        case 'observations/species':
+            header('Content-Type: application/json; charset=utf-8');
+            $items = list_species_options();
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'observations/export':
+            $items = q_observations_export($params);
+            header('Content-Type: text/html; charset=utf-8');
+            echo render_export_html($items, $params);
+            break;
+        case 'observations/evolution':
+            header('Content-Type: application/json; charset=utf-8');
+            $result = q_evolution($params);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
         case 'filters/zones':
+            header('Content-Type: application/json; charset=utf-8');
             $result = q_zones($params);
             echo json_encode(['items' => $result], JSON_UNESCAPED_UNICODE);
             break;
         case 'filters/sites':
+            header('Content-Type: application/json; charset=utf-8');
             $result = q_sites($params);
             echo json_encode(['items' => $result], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'auth/register':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = null;
+            if (!empty($_SESSION['user_id'])) {
+                $actor = fetch_user_by_id((int)$_SESSION['user_id']);
+            }
+            $result = register_user($params, $actor);
+            echo json_encode(['user' => $result], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'auth/login':
+            header('Content-Type: application/json; charset=utf-8');
+            $result = login_user($params);
+            echo json_encode(['user' => $result], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'auth/logout':
+            header('Content-Type: application/json; charset=utf-8');
+            clear_session_user();
+            echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'auth/me':
+            header('Content-Type: application/json; charset=utf-8');
+            if (empty($_SESSION['user_id'])) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            $user = fetch_user_by_id((int)$_SESSION['user_id']);
+            if (!$user) {
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+                break;
+            }
+            echo json_encode(['user' => sanitize_user($user)], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'profile/update':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $result = update_user_profile($params, $user);
+            echo json_encode(['user' => $result], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'pending/create':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $result = create_pending_observation($params, $user);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
+        case 'pending/list':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $items = list_pending_observations($params, $user);
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'pending/review':
+            header('Content-Type: application/json; charset=utf-8');
+            require_session_user(['controleur', 'admin']);
+            $items = list_pending_review($params);
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'pending/approve':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = require_session_user(['controleur', 'admin']);
+            $id = isset($params['id']) ? (int)$params['id'] : 0;
+            if ($id <= 0) {
+                throw new ApiException('Missing id', 422);
+            }
+            $result = approve_pending_observation($id, $actor);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
+        case 'pending/reject':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = require_session_user(['controleur', 'admin']);
+            $id = isset($params['id']) ? (int)$params['id'] : 0;
+            if ($id <= 0) {
+                throw new ApiException('Missing id', 422);
+            }
+            $note = (string)($params['note'] ?? '');
+            $result = reject_pending_observation($id, $actor, $note);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
+        case 'messages/users':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $items = list_users_basic($user);
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'messages/list':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $items = fetch_messages($params, $user);
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'messages/send':
+            header('Content-Type: application/json; charset=utf-8');
+            $user = require_session_user();
+            $result = send_message($params, $user, $_FILES ?? []);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
+        case 'messages/stream':
+            $user = require_session_user();
+            stream_messages($params, $user);
             break;
         default:
             // Unknown route.  Return a 404 response with helpful info.
             http_response_code(404);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'error' => 'Not found',
                 'routes' => [
                     'observations'        => 'List observations with pagination',
                     'observations/geo'    => 'GeoJSON of observations',
                     'observations/stats'  => 'Dashboard statistics',
+                    'observations/export' => 'HTML export (print to PDF)',
+                    'observations/evolution' => 'Compare periods',
                     'filters/zones'       => 'List of available zones',
-                    'filters/sites'       => 'List of available sites (optionally filtered by zone)'
+                    'filters/sites'       => 'List of available sites (optionally filtered by zone)',
+                    'auth/register'       => 'Register user',
+                    'auth/login'          => 'Login user',
+                    'auth/logout'         => 'Logout user',
+                    'auth/me'             => 'Current user',
+                    'pending/create'      => 'Submit observation',
+                    'pending/list'        => 'My submissions',
+                    'pending/review'      => 'Review submissions',
+                    'messages/users'      => 'List users',
+                    'messages/list'       => 'List messages',
+                    'messages/send'       => 'Send message',
+                    'messages/stream'     => 'Stream messages (SSE)'
                 ],
             ], JSON_UNESCAPED_UNICODE);
             break;
     }
+} catch (ApiException $e) {
+    http_response_code($e->status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'error' => $e->getMessage(),
+    ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     // Return a 500 with the error message for debugging.  In production,
     // you may want to hide the detailed message.
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'error'   => 'Server error',
         'message' => $e->getMessage(),
