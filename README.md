@@ -37,13 +37,19 @@ index_moteur.html -> api.php?route=... -> functions_monitoring_api.php -> MySQL
 
 ## Lancer l'application
 Ouvrir `http://localhost/monitoring/index.html`.
-Choisir l'espace visiteur ou charge de suivi.
+Page d'accueil avec deux zones cliquables:
+- Espace visiteur -> `index_moteur.html`
+- Espace charge de suivi -> `charge_suivi.html`
+- Espace controle qualite -> `controle_qualite.html`
 
 Acces direct visiteur: `http://localhost/monitoring/index_moteur.html`.
 Si WebGL est indisponible, l'onglet Carte est masque; utiliser Tableau/Stats.
 
 ## Espace Charge de suivi
 Ouvrir `http://localhost/monitoring/charge_suivi.html`.
+
+## Espace Controle qualite
+Ouvrir `http://localhost/monitoring/controle_qualite.html`.
 
 Profil "Charge de suivi" (role `charge_suivi`) - privileges principaux:
 - Authentification: inscription + connexion.
@@ -55,15 +61,24 @@ Profil "Charge de suivi" (role `charge_suivi`) - privileges principaux:
 - Messagerie temps reel (SSE) + pieces jointes.
 - Edition du profil (nom/email/telephone) et preferences UI.
 - Evolution statistique (comparaison de periodes).
+- Aide a la saisie: listes deroulantes (WiCode, code FR, nom FR, nom scientifique, anglais, famille) basees sur `birds`.
+
+Profil "Controle qualite par pole" (role `controle_qualite`) - privileges principaux:
+- Meme base que `charge_suivi`.
+- Validation ou rejet des observations en attente pour son pole (zone, valeur normalisee).
+- Insertion automatique dans `birds` apres validation.
+- Gestion des comptes `charge_suivi` de son pole (creation/desactivation).
+- Suivi des validations et exports filtres par pole.
 
 Roles associes:
 - `charge_suivi`: soumettre + consulter + partager.
 - `controleur`: valider/rejeter les observations en attente.
+- `controle_qualite`: valider/rejeter les observations de son pole + gestion charge_suivi.
 - `admin`: meme droits que controleur + gestion de roles lors inscription.
 
 Flux de validation:
 ```
-charge_suivi -> observation_pending -> validation (controleur/admin) -> birds
+charge_suivi -> observation_pending -> validation (controleur/controle_qualite/admin) -> birds
 ```
 
 ## API (routes et parametres)
@@ -78,6 +93,9 @@ Routes:
   - Params: filtres.
 - `filters/zones`: liste des zones.
 - `filters/sites`: liste des sites (param `zone` optionnel).
+- `users/list`: liste des utilisateurs (admin/controle_qualite).
+- `users/create`: creation utilisateur (admin/controle_qualite).
+- `users/status`: activer/desactiver un utilisateur (admin/controle_qualite).
 
 Filtres supportes:
 - `q` (texte libre)
@@ -96,10 +114,9 @@ Filtres supportes:
 - `zone`: liste de zones.
 - `search_observations_view`: vue derivee de `birds`, utilisee si presente.
 - `search_index`: present dans le dump, non utilise par l'API actuelle.
-- `users`: comptes + roles (`charge_suivi`, `controleur`, `admin`).
+- `users`: comptes + roles (`charge_suivi`, `controleur`, `controle_qualite`, `admin`) + champ `pole`.
 - `observation_pending`: observations en attente de validation.
-- `messages`: messagerie interne.
-- `message_attachments`: fichiers lies aux messages (stockes sous `uploads/messages/`).
+- `messagerie`: messagerie interne (piece jointe integree dans la table).
 
 ## Maintenance / mises a jour futures
 - Ajouter un filtre:

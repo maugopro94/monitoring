@@ -92,6 +92,136 @@ function messages_upload_dir(): string
     return $dir;
 }
 
+function has_messages_table(): bool
+{
+    static $has;
+    if (is_bool($has)) {
+        return $has;
+    }
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT table_name FROM information_schema.tables WHERE table_schema = :schema AND table_name IN ("messagerie","message","messages")');
+        $st->execute([':schema' => DB_NAME]);
+        $has = (bool)$st->fetchColumn();
+    } catch (Throwable $e) {
+        $has = false;
+    }
+    if (!$has) {
+        try {
+            $pdo = db();
+            $st = $pdo->query("SHOW TABLES LIKE 'messagerie'");
+            if ($st && $st->fetchColumn()) {
+                $has = true;
+            } else {
+                $st = $pdo->query("SHOW TABLES LIKE 'message'");
+                if ($st && $st->fetchColumn()) {
+                    $has = true;
+                } else {
+                    $st = $pdo->query("SHOW TABLES LIKE 'messages'");
+                    $has = (bool)($st && $st->fetchColumn());
+                }
+            }
+        } catch (Throwable $e) {
+            $has = false;
+        }
+    }
+    return $has;
+}
+
+function message_table_name(): string
+{
+    static $name;
+    if (is_string($name) && $name !== '') {
+        return $name;
+    }
+    if (!has_messages_table()) {
+        $name = 'messagerie';
+        return $name;
+    }
+    $candidates = ['messagerie', 'message', 'messages'];
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT table_name FROM information_schema.tables WHERE table_schema = :schema AND table_name = :table');
+        foreach ($candidates as $candidate) {
+            $st->execute([
+                ':schema' => DB_NAME,
+                ':table' => $candidate,
+            ]);
+            if ($st->fetchColumn()) {
+                $name = $candidate;
+                return $name;
+            }
+        }
+        $name = 'messagerie';
+    } catch (Throwable $e) {
+        try {
+            $pdo = db();
+            foreach ($candidates as $candidate) {
+                $st = $pdo->query("SHOW TABLES LIKE '{$candidate}'");
+                if ($st && $st->fetchColumn()) {
+                    $name = $candidate;
+                    return $name;
+                }
+            }
+            $name = 'messagerie';
+        } catch (Throwable $e2) {
+            $name = 'messagerie';
+        }
+    }
+    return $name;
+}
+
+function message_column_map(): array
+{
+    static $map;
+    if (is_array($map)) {
+        return $map;
+    }
+    $map = [];
+    if (!has_messages_table()) {
+        return $map;
+    }
+    $pdo = db();
+    $table = message_table_name();
+    $cols = [];
+    try {
+        $st = $pdo->prepare('SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema = :schema AND table_name = :table');
+        $st->execute([
+            ':schema' => DB_NAME,
+            ':table' => $table,
+        ]);
+        $cols = $st->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        try {
+            $st = $pdo->query('DESCRIBE `' . $table . '`');
+            $cols = $st ? $st->fetchAll(PDO::FETCH_COLUMN) : [];
+        } catch (Throwable $e2) {
+            $cols = [];
+        }
+    }
+    $set = array_flip($cols);
+    $pick = function (array $candidates) use ($set): ?string {
+        foreach ($candidates as $name) {
+            if (isset($set[$name])) {
+                return $name;
+            }
+        }
+        return null;
+    };
+    $map = [
+        'sender' => $pick(['sender_id', 'sender', 'from_id', 'from_user_id', 'expediteur_id', 'id_expediteur', 'id_sender']),
+        'recipient' => $pick(['recipient_id', 'recipient', 'to_id', 'to_user_id', 'destinataire_id', 'id_destinataire', 'receiver_id', 'id_receiver']),
+        'body' => $pick(['body', 'message', 'contenu', 'content', 'text', 'texte', 'msg']),
+        'created' => $pick(['created_at', 'created', 'sent_at', 'date', 'date_envoi', 'created_on']),
+        'id' => $pick(['id', 'message_id', 'id_message', 'id_messagerie']),
+        'file_path' => $pick(['file_path', 'file', 'fichier', 'piece_jointe', 'attachment', 'file_url', 'path']),
+        'file_name' => $pick(['file_name', 'nom_fichier', 'fichier_nom', 'attachment_name']),
+        'file_size' => $pick(['file_size', 'taille', 'size']),
+        'mime_type' => $pick(['mime_type', 'type_mime', 'format']),
+    ];
+    return $map;
+}
+
 function sanitize_filename(string $name): string
 {
     $name = basename($name);
@@ -402,6 +532,7 @@ function register_user(array $data, ?array $actor = null): array
     $password = (string)($data['password'] ?? '');
     $fullName = trim((string)($data['full_name'] ?? ''));
     $phone = trim((string)($data['phone'] ?? ''));
+    $pole = null;
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         api_error('Invalid email', 422);
     }
@@ -415,18 +546,38 @@ function register_user(array $data, ?array $actor = null): array
         api_error('Email already used', 409);
     }
     $role = 'charge_suivi';
-    $allowed = ['charge_suivi', 'controleur', 'admin'];
+    $allowed = ['charge_suivi', 'controleur', 'controle_qualite', 'admin'];
     if ($actor && ($actor['role'] ?? '') === 'admin' && in_array(($data['role'] ?? ''), $allowed, true)) {
         $role = (string)$data['role'];
+    } elseif (!$actor && in_array(($data['role'] ?? ''), ['charge_suivi', 'controle_qualite'], true)) {
+        $role = (string)$data['role'];
+    }
+    if ($actor && ($actor['role'] ?? '') === 'controle_qualite') {
+        $role = 'charge_suivi';
+        $poleValue = trim((string)($actor['pole'] ?? ''));
+        $poleValue = $poleValue !== '' ? normalize_zone_key($poleValue) : '';
+        $pole = $poleValue !== '' ? $poleValue : null;
+    } elseif ($actor && ($actor['role'] ?? '') === 'admin') {
+        $poleValue = trim((string)($data['pole'] ?? ''));
+        $poleValue = $poleValue !== '' ? normalize_zone_key($poleValue) : '';
+        $pole = $poleValue !== '' ? $poleValue : null;
+    } elseif ($role === 'controle_qualite') {
+        $poleValue = trim((string)($data['pole'] ?? ''));
+        $poleValue = $poleValue !== '' ? normalize_zone_key($poleValue) : '';
+        if ($poleValue === '') {
+            api_error('Pole required', 422);
+        }
+        $pole = $poleValue;
     }
     $pdo = db();
-    $st = $pdo->prepare('INSERT INTO users (full_name, email, phone, role, password_hash, status, created_at, updated_at) VALUES (:full_name, :email, :phone, :role, :password_hash, :status, :created_at, :updated_at)');
+    $st = $pdo->prepare('INSERT INTO users (full_name, email, phone, pole, role, password_hash, status, created_at, updated_at) VALUES (:full_name, :email, :phone, :pole, :role, :password_hash, :status, :created_at, :updated_at)');
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $now = now_ts();
     $st->execute([
         ':full_name' => $fullName,
         ':email' => $email,
         ':phone' => $phone !== '' ? $phone : null,
+        ':pole' => $pole,
         ':role' => $role,
         ':password_hash' => $hash,
         ':status' => 'active',
@@ -491,6 +642,12 @@ function update_user_profile(array $data, array $user): array
         $fields[] = 'password_hash = :password_hash';
         $bind[':password_hash'] = password_hash((string)$data['password'], PASSWORD_DEFAULT);
     }
+    if (isset($data['pole']) && in_array(($user['role'] ?? ''), ['admin', 'controle_qualite'], true)) {
+        $pole = trim((string)$data['pole']);
+        $pole = $pole !== '' ? normalize_zone_key($pole) : '';
+        $fields[] = 'pole = :pole';
+        $bind[':pole'] = $pole !== '' ? $pole : null;
+    }
 
     if (!$fields) {
         return sanitize_user($user);
@@ -517,6 +674,113 @@ function list_users_basic(array $currentUser): array
         $row['is_self'] = ((int)$row['id'] === (int)$currentUser['id']);
     }
     return $rows;
+}
+
+function list_users_admin(array $params, array $actor): array
+{
+    $roleFilter = trim((string)($params['role'] ?? ''));
+    $statusFilter = trim((string)($params['status'] ?? ''));
+    $limit = isset($params['limit']) ? (int)$params['limit'] : 200;
+    $limit = max(1, min($limit, 500));
+
+    $actorRole = $actor['role'] ?? '';
+    if (!in_array($actorRole, ['admin', 'controle_qualite'], true)) {
+        api_error('Forbidden', 403);
+    }
+    if ($actorRole === 'controle_qualite') {
+        $roleFilter = 'charge_suivi';
+    }
+
+    $sql = 'SELECT id, full_name, email, phone, role, status, pole, created_at
+            FROM users WHERE 1=1';
+    $bind = [];
+    if ($roleFilter !== '') {
+        $sql .= ' AND role = :role';
+        $bind[':role'] = $roleFilter;
+    }
+    if ($statusFilter !== '') {
+        $sql .= ' AND status = :status';
+        $bind[':status'] = $statusFilter;
+    }
+    if ($actorRole === 'controle_qualite') {
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        $sql .= ' AND UPPER(TRIM(pole)) = :pole';
+        $bind[':pole'] = normalize_zone_key($pole);
+    }
+    $sql .= ' ORDER BY full_name LIMIT :limit';
+
+    $pdo = db();
+    $st = $pdo->prepare($sql);
+    foreach ($bind as $key => $value) {
+        $st->bindValue($key, $value);
+    }
+    $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll();
+}
+
+function create_user_admin(array $data, array $actor): array
+{
+    $actorRole = $actor['role'] ?? '';
+    if (!in_array($actorRole, ['admin', 'controle_qualite'], true)) {
+        api_error('Forbidden', 403);
+    }
+    if ($actorRole === 'controle_qualite') {
+        $data['role'] = 'charge_suivi';
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        $data['pole'] = $pole;
+    }
+    return register_user($data, $actor);
+}
+
+function update_user_status(array $params, array $actor): array
+{
+    $actorRole = $actor['role'] ?? '';
+    if (!in_array($actorRole, ['admin', 'controle_qualite'], true)) {
+        api_error('Forbidden', 403);
+    }
+    $id = isset($params['id']) ? (int)$params['id'] : 0;
+    if ($id <= 0) {
+        api_error('Missing id', 422);
+    }
+    $status = trim((string)($params['status'] ?? ''));
+    if (!in_array($status, ['active', 'disabled'], true)) {
+        api_error('Invalid status', 422);
+    }
+    $target = fetch_user_by_id($id);
+    if (!$target) {
+        api_error('User not found', 404);
+    }
+    if ($actorRole === 'controle_qualite') {
+        if (($target['role'] ?? '') !== 'charge_suivi') {
+            api_error('Forbidden', 403);
+        }
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        if (normalize_zone_key($target['pole'] ?? '') !== normalize_zone_key($pole)) {
+            api_error('Forbidden', 403);
+        }
+    }
+    if ((int)$target['id'] === (int)$actor['id']) {
+        api_error('Forbidden', 403);
+    }
+    $pdo = db();
+    $st = $pdo->prepare('UPDATE users SET status = :status, updated_at = :updated_at WHERE id = :id');
+    $st->execute([
+        ':status' => $status,
+        ':updated_at' => now_ts(),
+        ':id' => $id,
+    ]);
+    $fresh = fetch_user_by_id($id);
+    return sanitize_user($fresh ?? []);
 }
 
 /**
@@ -567,6 +831,26 @@ function build_where_view(array $params, string $alias = 'v', ?string $dateExpr 
         if ($site !== '') {
             $where .= " AND {$alias}.site_norm = :site";
             $bind[':site'] = $site;
+        }
+    }
+    if (!empty($params['qc_pole'])) {
+        $pole = normalize_zone_key((string)$params['qc_pole']);
+        if ($pole !== '') {
+            $where .= " AND {$alias}.site_norm IN (
+                SELECT scoped.site_norm FROM (
+                    SELECT s.name_norm AS site_norm
+                    FROM sites s
+                    INNER JOIN zone z ON z.id = s.zone_id
+                    WHERE z.name_norm = :qc_pole
+                    UNION
+                    SELECT DISTINCT b2.site_norm AS site_norm
+                    FROM birds b2
+                    WHERE b2.site_norm IS NOT NULL
+                      AND b2.zone_norm = :qc_pole2
+                ) scoped
+            )";
+            $bind[':qc_pole'] = $pole;
+            $bind[':qc_pole2'] = $pole;
         }
     }
     if (!empty($params['famille'])) {
@@ -671,6 +955,26 @@ function build_where(array $params, bool $for_count = false): array
         $where .= ' AND b.site_norm = :site';
         $bind[':site'] = strtoupper(trim($params['site']));
     }
+    if (!empty($params['qc_pole'])) {
+        $pole = normalize_zone_key((string)$params['qc_pole']);
+        if ($pole !== '') {
+            $where .= ' AND b.site_norm IN (
+                SELECT scoped.site_norm FROM (
+                    SELECT s.name_norm AS site_norm
+                    FROM sites s
+                    INNER JOIN zone z ON z.id = s.zone_id
+                    WHERE z.name_norm = :qc_pole
+                    UNION
+                    SELECT DISTINCT b2.site_norm AS site_norm
+                    FROM birds b2
+                    WHERE b2.site_norm IS NOT NULL
+                      AND b2.zone_norm = :qc_pole2
+                ) scoped
+            )';
+            $bind[':qc_pole'] = $pole;
+            $bind[':qc_pole2'] = $pole;
+        }
+    }
     if (!empty($params['famille'])) {
         $where .= ' AND b.famille = :famille';
         $bind[':famille'] = $params['famille'];
@@ -718,6 +1022,10 @@ function build_where(array $params, bool $for_count = false): array
  */
 function q_zones(array $params = []): array
 {
+    if (!empty($params['qc_pole'])) {
+        $pole = normalize_zone_key((string)$params['qc_pole']);
+        return $pole !== '' ? [$pole] : [];
+    }
     $pdo = db();
     $sql = 'SELECT DISTINCT b.zone_norm AS zone FROM birds b WHERE b.zone_norm IS NOT NULL ORDER BY b.zone_norm';
     $st = $pdo->query($sql);
@@ -735,6 +1043,30 @@ function q_zones(array $params = []): array
 function q_sites(array $params = []): array
 {
     $pdo = db();
+    if (!empty($params['qc_pole'])) {
+        $pole = normalize_zone_key((string)$params['qc_pole']);
+        if ($pole === '') {
+            return [];
+        }
+        if (!empty($params['zone']) && normalize_zone_key((string)$params['zone']) !== $pole) {
+            return [];
+        }
+        $sql = 'SELECT DISTINCT site_norm AS site FROM (
+                    SELECT s.name_norm AS site_norm
+                    FROM sites s
+                    INNER JOIN zone z ON z.id = s.zone_id
+                    WHERE z.name_norm = :pole
+                    UNION
+                    SELECT DISTINCT b.site_norm AS site_norm
+                    FROM birds b
+                    WHERE b.site_norm IS NOT NULL
+                      AND b.zone_norm = :pole2
+                ) scoped
+                ORDER BY site_norm';
+        $st = $pdo->prepare($sql);
+        $st->execute([':pole' => $pole, ':pole2' => $pole]);
+        return $st->fetchAll(PDO::FETCH_COLUMN);
+    }
     $sql = 'SELECT DISTINCT b.site_norm AS site FROM birds b WHERE b.site_norm IS NOT NULL';
     $bind = [];
     if (!empty($params['zone'])) {
@@ -787,6 +1119,63 @@ function list_species_options(): array
         $items[] = $item;
     }
     return $items;
+}
+
+/**
+ * Return a list of members for the landing page.
+ *
+ * @param array $params supports optional: limit
+ * @return array<int,array<string,string>>
+ */
+function list_members(array $params = []): array
+{
+    $limit = isset($params['limit']) && (int)$params['limit'] > 0 ? (int)$params['limit'] : 12;
+    $limit = max(1, min($limit, 1000));
+    $pdo = db();
+    $sql = 'SELECT id, prenom, nom, pole, poste, telephone, email, photo, profession, slug
+            FROM members
+            ORDER BY id ASC
+            LIMIT :limit';
+    $st = $pdo->prepare($sql);
+    $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll();
+}
+
+/**
+ * Return species catalog with optional photo from birds table.
+ *
+ * @param array $params supports optional: limit
+ * @return array<int,array<string,string>>
+ */
+function list_especes(array $params = []): array
+{
+    $limit = isset($params['limit']) && (int)$params['limit'] > 0 ? (int)$params['limit'] : 200;
+    $limit = max(1, min($limit, 2000));
+    $pdo = db();
+    $sql = 'SELECT
+                e.id,
+                e.codeFrançais AS code_fr,
+                e.wiCode AS wicode,
+                e.nomFrançais AS nom_fr,
+                e.nomScientifique AS nom_sc,
+                e.englishName AS english,
+                e.famille,
+                e.statutDeConservationUICN AS statut,
+                p.photo
+            FROM especes e
+            LEFT JOIN (
+                SELECT wiCode, MIN(photo) AS photo
+                FROM birds
+                WHERE photo IS NOT NULL AND photo <> ""
+                GROUP BY wiCode
+            ) p ON p.wiCode = e.wiCode
+            ORDER BY e.nomFrançais, e.wiCode
+            LIMIT :limit';
+    $st = $pdo->prepare($sql);
+    $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $st->execute();
+    return $st->fetchAll();
 }
 
 /**
@@ -1410,23 +1799,88 @@ function list_pending_observations(array $params, array $user): array
     return $st->fetchAll();
 }
 
-function list_pending_review(array $params): array
+function list_pending_review(array $params, array $actor): array
 {
     $status = trim((string)($params['status'] ?? 'pending'));
     $limit = (int)($params['limit'] ?? 200);
     $limit = max(1, min($limit, 500));
+    $poleKey = null;
+    if (($actor['role'] ?? '') === 'controle_qualite') {
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        $poleKey = normalize_zone_key($pole);
+    }
     $sql = 'SELECT p.*, u.full_name AS user_name, u.email AS user_email
             FROM observation_pending p
             LEFT JOIN users u ON u.id = p.user_id
-            WHERE p.status = :status
+            WHERE p.status = :status';
+    if ($poleKey !== null) {
+        $sql .= ' AND UPPER(TRIM(p.site)) IN (
+                SELECT scoped.site_norm FROM (
+                    SELECT s.name_norm AS site_norm
+                    FROM sites s
+                    INNER JOIN zone z ON z.id = s.zone_id
+                    WHERE z.name_norm = :pole
+                    UNION
+                    SELECT DISTINCT b2.site_norm AS site_norm
+                    FROM birds b2
+                    WHERE b2.site_norm IS NOT NULL
+                      AND b2.zone_norm = :pole2
+                ) scoped
+            )';
+    }
+    $sql .= '
             ORDER BY p.created_at DESC, p.id DESC
             LIMIT :limit';
     $pdo = db();
     $st = $pdo->prepare($sql);
     $st->bindValue(':status', $status);
+    if ($poleKey !== null) {
+        $st->bindValue(':pole', $poleKey);
+        $st->bindValue(':pole2', $poleKey);
+    }
     $st->bindValue(':limit', $limit, PDO::PARAM_INT);
     $st->execute();
     return $st->fetchAll();
+}
+
+function assert_qc_site_access(?string $site, array $actor): void
+{
+    if (($actor['role'] ?? '') !== 'controle_qualite') {
+        return;
+    }
+    $pole = trim((string)($actor['pole'] ?? ''));
+    if ($pole === '') {
+        api_error('Pole missing', 422);
+    }
+    $site = trim((string)$site);
+    if ($site === '') {
+        api_error('Forbidden', 403);
+    }
+    $pdo = db();
+    $st = $pdo->prepare('SELECT 1 FROM (
+            SELECT s.name_norm AS site_norm
+            FROM sites s
+            INNER JOIN zone z ON z.id = s.zone_id
+            WHERE z.name_norm = :pole
+            UNION
+            SELECT DISTINCT b.site_norm AS site_norm
+            FROM birds b
+            WHERE b.site_norm IS NOT NULL
+              AND b.zone_norm = :pole2
+        ) scoped
+        WHERE scoped.site_norm = UPPER(TRIM(:site))
+        LIMIT 1');
+    $st->execute([
+        ':pole' => normalize_zone_key($pole),
+        ':pole2' => normalize_zone_key($pole),
+        ':site' => $site,
+    ]);
+    if (!$st->fetchColumn()) {
+        api_error('Forbidden', 403);
+    }
 }
 
 function approve_pending_observation(int $id, array $actor): array
@@ -1440,6 +1894,7 @@ function approve_pending_observation(int $id, array $actor): array
         if (!$row) {
             api_error('Pending observation not found', 404);
         }
+        assert_qc_site_access($row['site'] ?? null, $actor);
         if (($row['status'] ?? '') !== 'pending') {
             api_error('Observation already processed', 409);
         }
@@ -1536,6 +1991,16 @@ function approve_pending_observation(int $id, array $actor): array
 function reject_pending_observation(int $id, array $actor, string $note = ''): array
 {
     $pdo = db();
+    $stFetch = $pdo->prepare('SELECT zone, site, status FROM observation_pending WHERE id = :id LIMIT 1');
+    $stFetch->execute([':id' => $id]);
+    $row = $stFetch->fetch();
+    if (!$row) {
+        api_error('Pending observation not found', 404);
+    }
+    assert_qc_site_access($row['site'] ?? null, $actor);
+    if (($row['status'] ?? '') !== 'pending') {
+        api_error('Observation already processed', 409);
+    }
     $st = $pdo->prepare('UPDATE observation_pending SET status = :status, review_note = :note, reviewed_by = :reviewed_by, reviewed_at = :reviewed_at, updated_at = :updated_at WHERE id = :id AND status = :pending');
     $now = now_ts();
     $st->execute([
@@ -1639,10 +2104,7 @@ function render_export_html(array $items, array $params): string
             . '</tr>';
     }
     $html = '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Export observations</title>'
-        . '<style>body{font-family:Arial,sans-serif;margin:20px;color:#222}'
-        . 'h1{font-size:18px;margin:0 0 8px}p{font-size:12px;margin:0 0 12px}'
-        . 'table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;font-size:11px;text-align:left}'
-        . 'th{background:#f2f2f2}</style></head><body>'
+        . '<link rel="stylesheet" href="styles/app.css"/></head><body class="page-export">'
         . '<h1>Export observations</h1>'
         . '<p>' . $escape($filterText) . '</p>'
         . '<table><thead><tr>'
@@ -1751,59 +2213,123 @@ function fetch_messages(array $params, array $user): array
     if ($withId <= 0) {
         api_error('with_user_id required', 422);
     }
+    if (!has_messages_table()) {
+        return [];
+    }
+    $table = message_table_name();
+    $columns = message_column_map();
+    $senderCol = $columns['sender'] ?? null;
+    $recipientCol = $columns['recipient'] ?? null;
+    $bodyCol = $columns['body'] ?? null;
+    $createdCol = $columns['created'] ?? null;
+    $idCol = $columns['id'] ?? null;
+    $filePathCol = $columns['file_path'] ?? null;
+    $fileNameCol = $columns['file_name'] ?? null;
+    $fileSizeCol = $columns['file_size'] ?? null;
+    $mimeTypeCol = $columns['mime_type'] ?? null;
+    if (!$senderCol || !$recipientCol || !$bodyCol || !$idCol) {
+        return [];
+    }
     $sinceId = (int)($params['since_id'] ?? 0);
     $limit = (int)($params['limit'] ?? 200);
     $limit = max(1, min($limit, 500));
     $pdo = db();
-    $sql = 'SELECT m.*, u.full_name AS sender_name
-            FROM messages m
-            LEFT JOIN users u ON u.id = m.sender_id
-            WHERE ((m.sender_id = :me AND m.recipient_id = :with_id)
-                OR (m.sender_id = :with_id AND m.recipient_id = :me))';
+    $createdExpr = $createdCol ? "m.`{$createdCol}`" : 'NULL';
+    $attachmentSelect = '';
+    if ($filePathCol) {
+        $attachmentSelect .= ", m.`{$filePathCol}` AS attachment_path";
+    }
+    if ($fileNameCol) {
+        $attachmentSelect .= ", m.`{$fileNameCol}` AS attachment_name";
+    }
+    if ($fileSizeCol) {
+        $attachmentSelect .= ", m.`{$fileSizeCol}` AS attachment_size";
+    }
+    if ($mimeTypeCol) {
+        $attachmentSelect .= ", m.`{$mimeTypeCol}` AS attachment_mime";
+    }
+    $selectBase = "SELECT
+                m.`{$idCol}` AS id,
+                m.`{$senderCol}` AS sender_id,
+                m.`{$recipientCol}` AS recipient_id,
+                m.`{$bodyCol}` AS body,
+                {$createdExpr} AS created_at{$attachmentSelect}";
+    $sql = $selectBase . ",
+                u.full_name AS sender_name
+            FROM `{$table}` m
+            LEFT JOIN users u ON u.id = m.`{$senderCol}`
+            WHERE ((m.`{$senderCol}` = :me AND m.`{$recipientCol}` = :with_id)
+                OR (m.`{$senderCol}` = :with_id AND m.`{$recipientCol}` = :me))";
     $bind = [
         ':me' => (int)$user['id'],
         ':with_id' => $withId,
     ];
     if ($sinceId > 0) {
-        $sql .= ' AND m.id > :since_id';
+        $sql .= " AND m.`{$idCol}` > :since_id";
         $bind[':since_id'] = $sinceId;
     }
-    $sql .= ' ORDER BY m.id ASC LIMIT :limit';
-    $st = $pdo->prepare($sql);
-    foreach ($bind as $k => $v) {
-        $st->bindValue($k, $v);
+    $sql .= " ORDER BY m.`{$idCol}` ASC LIMIT :limit";
+    try {
+        $st = $pdo->prepare($sql);
+        foreach ($bind as $k => $v) {
+            $st->bindValue($k, $v);
+        }
+        $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $st->execute();
+        $rows = $st->fetchAll();
+    } catch (PDOException $e) {
+        $fallback = $selectBase . ",
+                NULL AS sender_name
+            FROM `{$table}` m
+            WHERE ((m.`{$senderCol}` = :me AND m.`{$recipientCol}` = :with_id)
+                OR (m.`{$senderCol}` = :with_id AND m.`{$recipientCol}` = :me))";
+        if ($sinceId > 0) {
+            $fallback .= " AND m.`{$idCol}` > :since_id";
+        }
+        $fallback .= " ORDER BY m.`{$idCol}` ASC LIMIT :limit";
+        try {
+            $st = $pdo->prepare($fallback);
+            foreach ($bind as $k => $v) {
+                $st->bindValue($k, $v);
+            }
+            $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $st->execute();
+            $rows = $st->fetchAll();
+        } catch (PDOException $e2) {
+            $me = (int)$user['id'];
+            $withId = (int)$withId;
+            $sinceSql = $sinceId > 0 ? " AND m.`{$idCol}` > {$sinceId}" : '';
+            $fallbackRaw = $selectBase . ",
+                    NULL AS sender_name
+                FROM `{$table}` m
+                WHERE ((m.`{$senderCol}` = {$me} AND m.`{$recipientCol}` = {$withId})
+                    OR (m.`{$senderCol}` = {$withId} AND m.`{$recipientCol}` = {$me})){$sinceSql}
+                ORDER BY m.`{$idCol}` ASC LIMIT {$limit}";
+            try {
+                $rows = $pdo->query($fallbackRaw)->fetchAll();
+            } catch (PDOException $e3) {
+                api_error('Messages query failed: ' . $e3->getMessage(), 500);
+            }
+        }
     }
-    $st->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $st->execute();
-    $rows = $st->fetchAll();
     if (!$rows) {
         return [];
     }
-    $messageIds = array_map(fn($row) => (int)$row['id'], $rows);
-    $attachments = fetch_message_attachments($messageIds);
     foreach ($rows as &$row) {
-        $row['attachments'] = $attachments[(int)$row['id']] ?? [];
+        $rowAttachments = [];
+        if (!empty($row['attachment_path'])) {
+            $rowAttachments[] = [
+                'file_name' => (string)($row['attachment_name'] ?? basename((string)$row['attachment_path'])),
+                'file_path' => (string)$row['attachment_path'],
+                'file_url' => (string)$row['attachment_path'],
+                'file_size' => (int)($row['attachment_size'] ?? 0),
+                'mime_type' => (string)($row['attachment_mime'] ?? ''),
+            ];
+        }
+        $row['attachments'] = $rowAttachments;
+        unset($row['attachment_path'], $row['attachment_name'], $row['attachment_size'], $row['attachment_mime']);
     }
     return $rows;
-}
-
-function fetch_message_attachments(array $messageIds): array
-{
-    $messageIds = array_values(array_filter($messageIds, fn($id) => $id > 0));
-    if (!$messageIds) {
-        return [];
-    }
-    $placeholders = implode(',', array_fill(0, count($messageIds), '?'));
-    $pdo = db();
-    $st = $pdo->prepare("SELECT * FROM message_attachments WHERE message_id IN ($placeholders) ORDER BY id ASC");
-    $st->execute($messageIds);
-    $rows = $st->fetchAll();
-    $grouped = [];
-    foreach ($rows as $row) {
-        $row['file_url'] = $row['file_path'];
-        $grouped[(int)$row['message_id']][] = $row;
-    }
-    return $grouped;
 }
 
 function store_message_attachment(array $file, int $messageId): ?array
@@ -1853,19 +2379,9 @@ function store_message_attachment(array $file, int $messageId): ?array
         api_error('Failed to save attachment', 500);
     }
     $relativePath = 'uploads/messages/' . $fileName;
-    $pdo = db();
     $now = now_ts();
-    $st = $pdo->prepare('INSERT INTO message_attachments (message_id, file_name, file_path, file_size, mime_type, created_at) VALUES (:message_id, :file_name, :file_path, :file_size, :mime_type, :created_at)');
-    $st->execute([
-        ':message_id' => $messageId,
-        ':file_name' => $safeName,
-        ':file_path' => $relativePath,
-        ':file_size' => $size,
-        ':mime_type' => $mime,
-        ':created_at' => $now,
-    ]);
     return [
-        'id' => (int)$pdo->lastInsertId(),
+        'id' => 0,
         'message_id' => $messageId,
         'file_name' => $safeName,
         'file_path' => $relativePath,
@@ -1884,25 +2400,81 @@ function send_message(array $data, array $user, array $files = []): array
     if ($recipientId <= 0 || ($body === '' && !$hasAttachment)) {
         api_error('recipient_id and message required', 422);
     }
+    if (!has_messages_table()) {
+        api_error('Messages table missing', 503);
+    }
+    $table = message_table_name();
+    $columns = message_column_map();
+    $senderCol = $columns['sender'] ?? null;
+    $recipientCol = $columns['recipient'] ?? null;
+    $bodyCol = $columns['body'] ?? null;
+    $createdCol = $columns['created'] ?? null;
+    $idCol = $columns['id'] ?? null;
+    $filePathCol = $columns['file_path'] ?? null;
+    $fileNameCol = $columns['file_name'] ?? null;
+    $fileSizeCol = $columns['file_size'] ?? null;
+    $mimeTypeCol = $columns['mime_type'] ?? null;
+    if (!$senderCol || !$recipientCol || !$bodyCol || !$idCol) {
+        api_error('Messages schema incomplete', 500);
+    }
+    if ($hasAttachment && !$filePathCol) {
+        api_error('Attachment columns missing', 500);
+    }
     $recipient = fetch_user_by_id($recipientId);
     if (!$recipient || ($recipient['status'] ?? '') !== 'active') {
         api_error('Recipient not found', 404);
     }
     $pdo = db();
     $now = now_ts();
-    $st = $pdo->prepare('INSERT INTO messages (sender_id, recipient_id, body, created_at) VALUES (:sender_id, :recipient_id, :body, :created_at)');
-    $st->execute([
-        ':sender_id' => (int)$user['id'],
-        ':recipient_id' => $recipientId,
+    $cols = [$senderCol, $recipientCol, $bodyCol];
+    $vals = [':sender', ':recipient', ':body'];
+    $bind = [
+        ':sender' => (int)$user['id'],
+        ':recipient' => $recipientId,
         ':body' => $body,
-        ':created_at' => $now,
-    ]);
+    ];
+    if ($createdCol) {
+        $cols[] = $createdCol;
+        $vals[] = ':created';
+        $bind[':created'] = $now;
+    }
+    $sql = 'INSERT INTO `' . $table . '` (' . implode(', ', array_map(fn($c) => "`{$c}`", $cols)) . ') VALUES (' . implode(', ', $vals) . ')';
+    $st = $pdo->prepare($sql);
+    $st->execute($bind);
     $messageId = (int)$pdo->lastInsertId();
     $attachments = [];
     if ($hasAttachment) {
-        $saved = store_message_attachment($files['attachment'], $messageId);
-        if ($saved) {
-            $attachments[] = $saved;
+        if ($filePathCol) {
+            $saved = store_message_attachment($files['attachment'], $messageId);
+            if ($saved) {
+                $updateCols = [$filePathCol => $saved['file_path']];
+                if ($fileNameCol) {
+                    $updateCols[$fileNameCol] = $saved['file_name'];
+                }
+                if ($fileSizeCol) {
+                    $updateCols[$fileSizeCol] = (int)$saved['file_size'];
+                }
+                if ($mimeTypeCol) {
+                    $updateCols[$mimeTypeCol] = $saved['mime_type'];
+                }
+                $setParts = [];
+                $updateBind = [':id' => $messageId];
+                foreach ($updateCols as $col => $val) {
+                    $key = ':' . $col;
+                    $setParts[] = "`{$col}` = {$key}";
+                    $updateBind[$key] = $val;
+                }
+                if ($setParts) {
+                    $stUpdate = $pdo->prepare('UPDATE `' . $table . '` SET ' . implode(', ', $setParts) . ' WHERE `' . $idCol . '` = :id');
+                    $stUpdate->execute($updateBind);
+                }
+                $attachments[] = $saved;
+            }
+        } else {
+            $saved = store_message_attachment($files['attachment'], $messageId);
+            if ($saved) {
+                $attachments[] = $saved;
+            }
         }
     }
     return [

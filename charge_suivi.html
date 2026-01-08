@@ -10,245 +10,9 @@
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
-  <style>
-:root{
-  --bg:#f4f7fb; --panel:#ffffff; --panel2:#f8fafc;
-  --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
-  --accent:#2f87e2; --accent2:#1f6fb8;
-  --sidebar:#2d3c4d; --sidebar2:#253241;
-  --sidebarText:#e9eef5; --sidebarMuted:#aab4c3;
-  --ok:#2bb673; --warn:#f4a340;
-  --shadow:0 10px 24px rgba(15,23,42,.08);
-  --label:#475569;
-  --field-bg:#f8fafc;
-  --profile-shadow:0 12px 24px rgba(15,23,42,.06);
-  --profile-secondary-bg:#eef2f6;
-  --profile-secondary-border:#d1d9e6;
-  --profile-secondary-text:#000;
-  --profile-secondary-hover:#e2e8f0;
-  --button-light-text:#000;
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:"Manrope",Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
-.hidden{display:none !important}
-.app{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
-.sidebar{background:var(--sidebar);border-right:1px solid rgba(255,255,255,.05);padding:16px;overflow:auto;color:var(--sidebarText)}
-.brand{display:flex;gap:10px;align-items:center;margin-bottom:16px}
-.dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(47,135,226,.5)}
-.brand h1{font-size:15px;margin:0;color:var(--sidebarText)}
-.brand p{margin:0;color:var(--sidebarMuted);font-size:12px}
-.nav{display:grid;gap:8px}
-.nav button{width:100%;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--sidebarText);cursor:pointer;font-weight:600}
-.nav button:hover{background:rgba(255,255,255,.06)}
-.nav button.active{background:rgba(47,135,226,.2);border-color:rgba(47,135,226,.3)}
-
-.main{display:grid;grid-template-rows:72px 1fr;overflow:hidden}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--panel)}
-.titleBlock{display:flex;flex-direction:column;gap:4px}
-.pageTitle{font-size:20px;font-weight:800}
-.pageSubtitle{font-size:12px;color:var(--muted)}
-.userChip{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border)}
-.avatar{width:32px;height:32px;border-radius:999px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
-.userName{font-weight:700;font-size:12px}
-.userRole{font-size:11px;color:var(--muted)}
-
-.content{position:relative;overflow:hidden}
-.view{position:absolute;inset:0;display:none;overflow:auto;padding:24px}
-.view.active{display:block}
-
-.card{border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;background:var(--panel);box-shadow:var(--shadow)}
-.card h2{font-size:14px;margin:0 0 12px;color:var(--text);font-weight:800}
-.cardHeader{font-size:14px;font-weight:800;margin-bottom:12px}
-label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
-input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);outline:none}
-input::placeholder,textarea::placeholder{color:var(--muted)}
-select{color-scheme:light dark}
-select option{background:var(--panel);color:var(--text)}
-select{
-  appearance:none;
-  -webkit-appearance:none;
-  -moz-appearance:none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
-    linear-gradient(135deg, var(--muted) 50%, transparent 50%),
-    linear-gradient(to right, var(--border), var(--border));
-  background-position:
-    calc(100% - 18px) calc(50% - 3px),
-    calc(100% - 12px) calc(50% - 3px),
-    calc(100% - 34px) 50%;
-  background-size:6px 6px,6px 6px,1px 18px;
-  background-repeat:no-repeat;
-  padding-right:38px;
-}
-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,135,226,.15)}
-textarea{min-height:90px;resize:vertical}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.btns{display:flex;gap:10px;margin-top:12px}
-.btns.end{justify-content:flex-end}
-.btns.end button{flex:unset}
-button{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;cursor:pointer;font-weight:700}
-button.secondary{background:#fff;color:var(--button-light-text)}
-button.ghost{background:transparent;color:var(--button-light-text)}
-button:disabled{opacity:.55;cursor:not-allowed}
-.status{font-size:12px;color:var(--muted);margin-top:8px}
-.pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#f3f4f6;font-size:11px}
-.pill.ok{border-color:rgba(43,182,115,.4);color:var(--ok);background:rgba(43,182,115,.12)}
-.pill.warn{border-color:rgba(244,163,64,.4);color:var(--warn);background:rgba(244,163,64,.12)}
-
-.tableWrap{max-height:380px;overflow:auto}
-table{width:100%;border-collapse:collapse;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:#fff}
-th,td{padding:10px;border-bottom:1px solid var(--border);font-size:12px;text-align:left}
-th{color:var(--muted);font-weight:800;background:var(--panel2);position:sticky;top:0}
-tr:hover td{background:#f8fafc}
-.small{font-size:11px;color:var(--muted)}
-
-.chatLayout{display:grid;grid-template-columns:240px 1fr;gap:12px;height:100%}
-.userList{height:100%;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-.userItem{padding:10px;border-bottom:1px solid var(--border);cursor:pointer}
-.userItem.active{background:#eef5ff}
-.chatPanel{display:grid;grid-template-rows:1fr auto;gap:10px;height:100%}
-.chatMessages{border:1px solid var(--border);border-radius:12px;padding:10px;overflow:auto;background:#fff}
-.chatComposer{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px}
-.chatInputWrap{display:flex;flex-direction:column;gap:6px}
-.chatComposer input{height:44px}
-.chatActions{display:flex;align-items:center;gap:8px}
-.chatComposer .sendBtn{min-width:84px;padding:8px 12px;height:40px;font-size:12px}
-.chatComposer .attachBtn{min-width:84px;padding:8px 12px;height:40px;font-size:12px}
-.attachPreview{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel2);border:1px dashed var(--border);font-size:12px;color:var(--muted)}
-.attachPreview .attachName{font-weight:700;color:var(--text)}
-.attachPreview .tiny{padding:4px 8px;border-radius:999px;font-size:11px}
-.attachments{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-.attachLink{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);color:var(--text);text-decoration:none;font-size:11px}
-.attachLink:hover{border-color:var(--accent);color:var(--accent2)}
-.kpiGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:18px}
-.kpiCard{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--panel2);text-align:center}
-.kpiValue{font-size:18px;font-weight:800}
-.mapWrap{position:relative;height:460px;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
-#reportMap{height:100%}
-.mapFallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel2);color:var(--muted);font-size:13px}
-.shareRow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.msg{margin-bottom:10px}
-.msg .meta{font-size:11px;color:var(--muted)}
-.msg .bubble{padding:8px 10px;border-radius:12px;display:inline-block;max-width:70%}
-.msg.me .bubble{background:#eaf2ff}
-.msg.other .bubble{background:#f3f4f6}
-
-.authWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
-.authCard{width:380px;border:1px solid var(--border);border-radius:16px;padding:16px;background:#fff;box-shadow:var(--shadow)}
-.authTabs{display:flex;gap:8px;margin-bottom:12px}
-.authTab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:#fff;text-align:center;cursor:pointer;font-weight:700;font-size:12px;color:var(--muted)}
-.authTab.active{color:var(--accent2);background:#eef5ff;border-color:#dbe8ff}
-
-.settingsLayout{display:grid;grid-template-columns:220px 1fr;gap:16px}
-.settingsNav{border:1px solid var(--border);border-radius:14px;background:#fff;padding:10px;box-shadow:var(--shadow);height:fit-content}
-.settingsTitle{font-weight:800;font-size:13px;color:var(--muted);padding:6px 10px}
-.settingsItem{width:100%;text-align:left;padding:10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;font-weight:700}
-.settingsItem.active{background:#eef5ff;border-color:#dbe8ff;color:var(--accent2)}
-.settingsPane{display:none}
-.settingsPane.active{display:block}
-.prefRow{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.prefRow:last-child{border-bottom:none}
-.switch{position:relative;display:inline-block;width:46px;height:24px}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#d1d5db;border-radius:999px;transition:0.2s}
-.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:white;border-radius:50%;transition:0.2s}
-.switch input:checked + .slider{background:var(--accent)}
-.switch input:checked + .slider:before{transform:translateX(22px)}
-.segmented{display:flex;gap:8px;margin-top:8px}
-.segmented button{flex:unset;background:#fff;color:var(--button-light-text)}
-.segmented button.active{background:#eef5ff;border-color:#dbe8ff;color:var(--accent2)}
-.themeGrid{display:flex;gap:10px;margin-top:8px}
-.themeCard{border:1px solid var(--border);border-radius:10px;padding:10px;min-width:80px;text-align:center;background:#fff;color:var(--button-light-text);cursor:pointer}
-.themeCard.active{border-color:#dbe8ff;background:#eef5ff;color:var(--accent2)}
-
-#profileView{color:var(--text)}
-#profileView label{color:var(--label);font-weight:700;letter-spacing:.02em}
-#profileView input,
-#profileView select,
-#profileView textarea{
-  background:var(--field-bg);
-  border-color:var(--border);
-  color:var(--text);
-}
-#profileView input:focus,
-#profileView select:focus,
-#profileView textarea:focus{
-  border-color:var(--accent);
-  box-shadow:0 0 0 3px rgba(47,135,226,.15);
-}
-#profileView select option{background:var(--panel);color:var(--text)}
-#profileView .card{border-color:var(--border);box-shadow:var(--profile-shadow)}
-#profileView .segmented button,
-#profileView .themeCard{background:var(--field-bg)}
-#profileView .btns button{padding:10px 16px;font-weight:700}
-#profileView .btns button.secondary{
-  background:var(--profile-secondary-bg);
-  color:var(--profile-secondary-text);
-  border-color:var(--profile-secondary-border);
-}
-#profileView .btns button.secondary:hover{background:var(--profile-secondary-hover)}
-#profileView .btns button:not(.secondary):not(.ghost){
-  background:linear-gradient(135deg,#2f87e2,#1f6fb8);
-  border-color:transparent;
-  box-shadow:0 6px 16px rgba(47,135,226,.25);
-}
-
-body.theme-dark{
-  --bg:#0f172a; --panel:#111827; --panel2:#0b1220;
-  --text:#e5e7eb; --muted:#9ca3af; --border:#1f2937;
-  --accent:#4aa8ff; --accent2:#84c5ff;
-  --sidebar:#0b1220; --sidebar2:#0b1220;
-  --sidebarText:#e5e7eb; --sidebarMuted:#9ca3af;
-  --ok:#34d399; --warn:#fbbf24;
-  --shadow:0 12px 26px rgba(0,0,0,.35);
-  --label:#cbd5f5;
-  --field-bg:#0b1220;
-  --profile-shadow:0 12px 24px rgba(0,0,0,.35);
-  --profile-secondary-bg:#1f2937;
-  --profile-secondary-border:#2a3646;
-  --profile-secondary-text:var(--text);
-  --profile-secondary-hover:#2a3646;
-  --button-light-text:var(--text);
-}
-body.theme-light{
-  --sidebar:#f8fafc;
-  --sidebar2:#f1f5f9;
-  --sidebarText:#1f2937;
-  --sidebarMuted:#64748b;
-}
-body.theme-dark .card,
-body.theme-dark .authCard,
-body.theme-dark .settingsNav,
-body.theme-dark .userList,
-body.theme-dark .chatMessages,
-body.theme-dark table{
-  background:var(--panel);
-  color:var(--text);
-}
-body.theme-dark input,
-body.theme-dark select,
-body.theme-dark textarea{
-  background-color:var(--panel);
-  color:var(--text);
-  border-color:var(--border);
-}
-body.theme-dark .topbar{background:var(--panel)}
-body.theme-dark .userChip{background:var(--panel2)}
-body.theme-dark th{background:var(--panel2)}
-body.theme-dark tr:hover td{background:rgba(255,255,255,.04)}
-body.theme-dark .pill{background:rgba(255,255,255,.06)}
-body.theme-dark .segmented button,
-body.theme-dark .themeCard,
-body.theme-dark .authTab{background:var(--panel)}
-body.theme-dark .segmented button.active,
-body.theme-dark .themeCard.active,
-body.theme-dark .authTab.active{background:rgba(132,197,255,.15)}
-body.theme-light .sidebar{border-right:1px solid var(--border)}
-body.theme-light .nav button:hover{background:rgba(47,135,226,.08)}
-body.theme-light .nav button.active{background:#eaf2ff;border-color:#dbe8ff;color:var(--accent2)}
-  </style>
+  <link rel="stylesheet" href="styles/app.css"/>
 </head>
-<body>
+<body class="page-shell page-charge">
   <div id="authView" class="authWrap">
     <div class="authCard">
       <div class="authTabs">
@@ -271,6 +35,9 @@ body.theme-light .nav button.active{background:#eaf2ff;border-color:#dbe8ff;colo
         <input id="regEmail" type="email" placeholder="email@exemple.com"/>
         <label>Telephone</label>
         <input id="regPhone" placeholder="77 000 00 00"/>
+        <label>Pole (zone)</label>
+        <input id="regPole" placeholder="Ex: NIAYES" list="registerPoleOptions"/>
+        <datalist id="registerPoleOptions"></datalist>
         <label>Mot de passe</label>
         <input id="regPassword" type="password" placeholder="*******"/>
         <div class="btns">
@@ -657,6 +424,9 @@ body.theme-light .nav button.active{background:#eaf2ff;border-color:#dbe8ff;colo
                   <input id="profileEmail" type="email" placeholder="email@exemple.com"/>
                   <label>Telephone</label>
                   <input id="profilePhone" placeholder="+221 77 000 00 00"/>
+                  <label>Pole (zone)</label>
+                  <input id="profilePole" placeholder="Pole du profil" list="profilePoleOptions"/>
+                  <datalist id="profilePoleOptions"></datalist>
                   <label>Organisation</label>
                   <input id="profileOrg" placeholder="Organisation"/>
                   <label>Biographie</label>
@@ -756,11 +526,12 @@ const state = {
   lastTotal: 0,
   reportStats: null,
   species: { items: [], maps: {} },
-  chat: { withUserId: null, lastId: 0, source: null, attachment: null }
+  chat: { withUserId: null, lastId: 0, source: null, attachment: null, pollTimer: null, badges: {} }
 };
 
 const PREFS_KEY = "charge_suivi_prefs";
 const EXTRAS_KEY = "charge_suivi_profile_extras";
+const CHAT_LAST_USER_KEY = "chat_last_user_id";
 
 const pageMeta = {
   submitView: { title: "Observations", subtitle: "Gestion des observations" },
@@ -777,6 +548,26 @@ function setTab(tabId) {
   updatePageMeta(tabId);
   if (tabId === "searchView" && reportMap) {
     setTimeout(() => reportMap.resize(), 80);
+  }
+}
+
+function getChatStorageKey() {
+  return state.user ? `${CHAT_LAST_USER_KEY}_${state.user.id}` : CHAT_LAST_USER_KEY;
+}
+
+function storeLastChatUser(userId) {
+  try {
+    localStorage.setItem(getChatStorageKey(), String(userId));
+  } catch {}
+}
+
+function loadLastChatUser() {
+  try {
+    const raw = localStorage.getItem(getChatStorageKey());
+    const parsed = raw ? Number(raw) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -949,6 +740,11 @@ function applyProfileFields() {
   $("profileLastName").value = nameParts.last;
   $("profileEmail").value = state.user.email || "";
   $("profilePhone").value = state.user.phone || "";
+  if ($("profilePole")) {
+    $("profilePole").value = state.user.pole || "";
+    const canEditPole = ["admin", "controle_qualite"].includes(state.user.role);
+    $("profilePole").disabled = !canEditPole;
+  }
   $("profileOrg").value = extras.org || "";
   $("profileBio").value = extras.bio || "";
   if ($("profilePassword")) $("profilePassword").value = "";
@@ -1065,7 +861,7 @@ async function checkAuth() {
 }
 
 function setupRoleViews() {
-  const canReview = ["controleur", "admin"].includes(state.user.role);
+  const canReview = ["controleur", "controle_qualite", "admin"].includes(state.user.role);
   const reviewTab = $("tabReview");
   if (reviewTab) {
     reviewTab.classList.toggle("hidden", !canReview);
@@ -1074,7 +870,7 @@ function setupRoleViews() {
 
 async function initData() {
   await Promise.all([loadZones(), loadSpeciesOptions(), loadMyPending(), loadUsers()]);
-  if (["controleur", "admin"].includes(state.user.role)) {
+  if (["controleur", "controle_qualite", "admin"].includes(state.user.role)) {
     await loadReviewList();
   }
 }
@@ -1108,12 +904,19 @@ $("btnLogin").addEventListener("click", async () => {
 $("btnRegister").addEventListener("click", async () => {
   $("authStatus").textContent = "";
   try {
-    await apiPost("auth/register", {
+    const pole = $("regPole") ? $("regPole").value.trim() : "";
+    if (!pole) {
+      $("authStatus").textContent = "Pole requis.";
+      return;
+    }
+    const payload = {
       full_name: $("regName").value.trim(),
       email: $("regEmail").value.trim(),
       phone: $("regPhone").value.trim(),
       password: $("regPassword").value
-    });
+    };
+    payload.pole = pole;
+    await apiPost("auth/register", payload);
     $("authStatus").textContent = "Compte cree, connectez-vous.";
   } catch (err) {
     $("authStatus").textContent = "Erreur inscription";
@@ -1123,7 +926,16 @@ $("btnRegister").addEventListener("click", async () => {
 $("btnLogout").addEventListener("click", async () => {
   await apiPost("auth/logout", {});
   state.user = null;
+  if (state.chat.source) {
+    state.chat.source.close();
+    state.chat.source = null;
+  }
+  if (state.chat.pollTimer) {
+    clearInterval(state.chat.pollTimer);
+    state.chat.pollTimer = null;
+  }
   showAuth(true);
+  window.location.href = "index.html";
 });
 
 // Tabs
@@ -1163,6 +975,24 @@ async function loadZones() {
     });
   });
   await loadSites("");
+}
+
+async function loadPoleOptions() {
+  try {
+    const zones = await apiGet("filters/zones");
+    ["profilePoleOptions", "registerPoleOptions"].forEach(id => {
+      const list = $(id);
+      if (!list) return;
+      list.innerHTML = "";
+      (zones.items || []).forEach(zone => {
+        const opt = document.createElement("option");
+        opt.value = zone;
+        list.appendChild(opt);
+      });
+    });
+  } catch {
+    // Keep manual input if zones fail to load.
+  }
 }
 
 async function loadSites(zone) {
@@ -1620,10 +1450,28 @@ async function loadUsers() {
     const div = document.createElement("div");
     div.className = "userItem";
     div.dataset.userId = user.id;
-    div.textContent = `${user.full_name} (${user.role})`;
-    div.addEventListener("click", () => selectUser(user));
+    div.tabIndex = 0;
+    div.setAttribute("role", "button");
+    const content = document.createElement("div");
+    content.className = "userItemContent";
+    content.textContent = `${user.full_name} (${user.role})`;
+    const badge = document.createElement("span");
+    badge.className = "msgBadge hidden";
+    badge.id = `msgBadge-${user.id}`;
+    badge.textContent = "1";
+    div.appendChild(content);
+    div.appendChild(badge);
     list.appendChild(div);
   });
+  if (!state.chat.withUserId) {
+    const lastId = loadLastChatUser();
+    if (lastId) {
+      const lastUser = state.users.find(u => Number(u.id) === lastId);
+      if (lastUser) {
+        selectUser(lastUser);
+      }
+    }
+  }
 }
 
 function selectUser(user) {
@@ -1632,11 +1480,37 @@ function selectUser(user) {
   state.chat.lastId = 0;
   clearAttachment();
   $("chatMessages").innerHTML = "";
+  clearUserBadge(user.id);
+  storeLastChatUser(user.id);
   if (state.chat.source) {
     state.chat.source.close();
   }
+  if (state.chat.pollTimer) {
+    clearInterval(state.chat.pollTimer);
+    state.chat.pollTimer = null;
+  }
   loadMessages(user.id);
   startStream(user.id);
+  startPolling();
+}
+
+function handleUserSelect(event) {
+  const item = event.target.closest(".userItem");
+  if (!item) return;
+  const userId = Number(item.dataset.userId);
+  const user = state.users.find(u => Number(u.id) === userId);
+  if (user) selectUser(user);
+}
+
+const userListEl = $("userList");
+if (userListEl) {
+  userListEl.addEventListener("click", handleUserSelect);
+  userListEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleUserSelect(event);
+    }
+  });
 }
 
 async function loadMessages(withUserId) {
@@ -1648,7 +1522,7 @@ function addMessage(msg) {
   const wrap = $("chatMessages");
   const div = document.createElement("div");
   div.className = "msg " + (msg.sender_id === state.user.id ? "me" : "other");
-  const safeBody = escapeHtml(msg.body || "");
+  const safeBody = escapeHtml(msg.body || msg.message || msg.contenu || "");
   const attachments = (msg.attachments || [])
     .map(att => {
       const name = escapeHtml(att.file_name || "piece_jointe");
@@ -1667,6 +1541,33 @@ function addMessage(msg) {
   wrap.appendChild(div);
   state.chat.lastId = Math.max(state.chat.lastId, Number(msg.id || 0));
   wrap.scrollTop = wrap.scrollHeight;
+  if (msg.sender_id && msg.sender_id !== state.user.id) {
+    if (state.chat.withUserId !== msg.sender_id || state.tab !== "chatView") {
+      incrementBadge(msg.sender_id);
+    }
+  }
+}
+
+function incrementBadge(userId) {
+  const key = String(userId);
+  const current = state.chat.badges[key] || 0;
+  const next = current + 1;
+  state.chat.badges[key] = next;
+  const badge = document.getElementById(`msgBadge-${userId}`);
+  if (badge) {
+    badge.textContent = String(next);
+    badge.classList.remove("hidden");
+  }
+}
+
+function clearUserBadge(userId) {
+  const key = String(userId);
+  state.chat.badges[key] = 0;
+  const badge = document.getElementById(`msgBadge-${userId}`);
+  if (badge) {
+    badge.textContent = "0";
+    badge.classList.add("hidden");
+  }
 }
 
 function startStream(withUserId) {
@@ -1692,9 +1593,28 @@ function startStream(withUserId) {
   };
 }
 
+function pollMessages() {
+  if (!state.chat.withUserId) return;
+  apiGet("messages/list", {
+    with_user_id: state.chat.withUserId,
+    since_id: state.chat.lastId,
+    limit: 200
+  }).then(res => {
+    (res.items || []).forEach(addMessage);
+  }).catch(() => {});
+}
+
+function startPolling() {
+  if (state.chat.pollTimer) clearInterval(state.chat.pollTimer);
+  state.chat.pollTimer = setInterval(pollMessages, 4000);
+}
+
 $("btnSendMsg").addEventListener("click", async () => {
   const body = $("chatInput").value.trim();
-  if (!state.chat.withUserId) return;
+  if (!state.chat.withUserId) {
+    $("chatInput").focus();
+    return;
+  }
   if (!body && !state.chat.attachment) return;
   $("chatInput").value = "";
   let res;
@@ -1753,9 +1673,12 @@ $("btnUpdateProfile").addEventListener("click", async () => {
     const fullName = [first, last].filter(Boolean).join(" ").trim();
     const email = $("profileEmail").value.trim();
     const phone = $("profilePhone").value.trim();
+    const poleInput = $("profilePole");
+    const pole = poleInput ? poleInput.value.trim() : "";
     const payload = { phone };
     if (fullName) payload.full_name = fullName;
     if (email) payload.email = email;
+    if (poleInput && !poleInput.disabled && pole !== "") payload.pole = pole;
     const res = await apiPost("profile/update", payload);
     state.user = res.user;
     saveProfileExtras({
@@ -1839,7 +1762,9 @@ updatePageMeta(state.tab);
 const initialPrefs = loadProfilePrefs();
 applyTheme(initialPrefs);
 applyPrefsUI(initialPrefs);
+loadPoleOptions();
 checkAuth();
 </script>
 </body>
 </html>
+

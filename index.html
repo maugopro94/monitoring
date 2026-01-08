@@ -1,49 +1,13 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Monitoring - Accueil</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet"/>
-  <style>
-:root{
-  --bg:#f7f4ef;
-  --panel:#ffffff;
-  --text:#1e293b;
-  --muted:#64748b;
-  --accent:#1d4ed8;
-  --accent2:#0ea5e9;
-  --border:#e2e8f0;
-  --shadow:0 16px 40px rgba(15,23,42,.12);
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:"Sora",system-ui,sans-serif;background:var(--bg);color:var(--text)}
-.hero{min-height:100vh;display:grid;place-items:center;padding:48px}
-.heroWrap{max-width:1100px;width:100%;display:grid;gap:24px}
-.header{display:flex;flex-direction:column;gap:10px}
-.kicker{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
-.title{font-size:40px;line-height:1.1;font-weight:700;max-width:720px}
-.subtitle{font-size:16px;color:var(--muted);max-width:680px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.card.clickable{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease}
-.card.clickable:hover{transform:translateY(-2px);box-shadow:0 20px 46px rgba(15,23,42,.16)}
-.card::after{content:"";position:absolute;inset:auto -30% -60% -30%;height:220px;background:radial-gradient(circle at 20% 30%,rgba(14,165,233,.15),transparent 60%)}
-.cardTitle{font-size:20px;font-weight:700;margin:0 0 8px}
-.cardDesc{color:var(--muted);font-size:14px;margin:0 0 18px}
-.tag{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;color:#334155;font-size:11px;padding:6px 10px;border-radius:999px;margin-bottom:10px}
-.actions{display:flex;gap:10px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border-radius:12px;border:1px solid transparent;background:linear-gradient(120deg,var(--accent),var(--accent2));color:#fff;font-weight:600;text-decoration:none}
-.btn.secondary{background:#fff;color:var(--text);border-color:var(--border)}
-.footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
-.blob{position:absolute;top:-90px;right:-90px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#60a5fa,#22d3ee);opacity:.25}
-@media (max-width:720px){
-  .title{font-size:32px}
-  .hero{padding:32px}
-}
-  </style>
+  <link rel="stylesheet" href="styles/app.css"/>
 </head>
-<body>
+<body class="page-landing">
   <main class="hero">
     <div class="heroWrap">
       <div class="header">
@@ -74,7 +38,72 @@ body{margin:0;font-family:"Sora",system-ui,sans-serif;background:var(--bg);color
             <a class="btn secondary" href="charge_suivi.html#submitView">Nouvelle observation</a>
           </div>
         </section>
+
+        <section class="card clickable" data-href="controle_qualite.html" role="link" tabindex="0">
+          <div class="blob"></div>
+          <div class="tag">Espace controle qualite</div>
+          <h2 class="cardTitle">Validation par pole</h2>
+          <p class="cardDesc">Validation des observations du pole, suivi des controles et statistiques.</p>
+          <div class="actions">
+            <a class="btn" href="controle_qualite.html">Acceder a l espace</a>
+            <a class="btn secondary" href="controle_qualite.html#reviewView">Voir les validations</a>
+          </div>
+        </section>
       </div>
+
+      <section class="section" id="speciesSection">
+        <div class="sectionHeader">
+          <div>
+            <h2 class="sectionTitle">Especes repertoriees</h2>
+            <p class="sectionSubtitle">Fiches techniques par espece, famille et statut.</p>
+          </div>
+        </div>
+        <div class="speciesBoard">
+          <div class="speciesToolbar">
+            <div class="speciesFilters">
+              <input class="speciesSearch" id="speciesSearch" type="search" placeholder="Rechercher une espece, wicode ou nom scientifique"/>
+              <select class="speciesSelect" id="speciesFamily">
+                <option value="">Toutes les familles</option>
+              </select>
+            </div>
+            <div class="speciesCount" id="speciesCount">Chargement...</div>
+          </div>
+          <div class="speciesScroll">
+            <div class="speciesGrid" id="speciesGrid">
+              <div class="speciesEmpty">Chargement des especes...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="sectionHeader">
+          <div>
+            <h2 class="sectionTitle">Membres et particularites</h2>
+            <p class="sectionSubtitle">Decouvrez les profils et leurs poles d expertise.</p>
+          </div>
+        </div>
+        <div class="membersBoard">
+          <div class="membersToolbar">
+            <div class="membersFilters">
+              <select class="membersSelect" id="membersPole">
+                <option value="">Tous les poles</option>
+              </select>
+            </div>
+            <div class="membersCount" id="membersCount">Chargement...</div>
+          </div>
+          <div class="membersTable">
+            <div class="membersRow header">
+              <div>Membre</div>
+              <div>Pole / Poste</div>
+              <div>Contact</div>
+            </div>
+            <div id="membersList" class="membersList">
+              <div class="membersEmpty">Chargement des membres...</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div class="footer">
         <div>Monitoring - Observations</div>
@@ -98,6 +127,334 @@ body{margin:0;font-family:"Sora",system-ui,sans-serif;background:var(--bg);color
         }
       });
     });
+
+    function getInitials(name){
+      const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return "MM";
+      if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+      return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+    }
+
+    function buildMemberRow(member){
+      const fullName = `${member.prenom || ""} ${member.nom || ""}`.trim();
+      const pole = (member.pole || "").trim();
+      const poste = (member.poste || "").trim();
+      const profession = (member.profession || "").trim();
+      const role = poste || profession || "Non renseigne";
+      const email = (member.email || "").trim();
+      const tel = (member.telephone || "").trim();
+
+      const row = document.createElement("div");
+      row.className = "membersRow";
+
+      const identity = document.createElement("div");
+      identity.className = "memberIdentity";
+      const avatar = document.createElement("div");
+      avatar.className = "memberAvatar";
+      avatar.textContent = getInitials(fullName);
+      const info = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "memberName";
+      name.textContent = fullName || "Membre";
+      const sub = document.createElement("div");
+      sub.className = "memberSub";
+      sub.textContent = role;
+      info.appendChild(name);
+      info.appendChild(sub);
+      identity.appendChild(avatar);
+      identity.appendChild(info);
+
+      const poleCell = document.createElement("div");
+      const badge = document.createElement("div");
+      badge.className = "memberBadge";
+      badge.textContent = pole || "Pole non renseigne";
+      const posteLine = document.createElement("div");
+      posteLine.className = "memberSub";
+      posteLine.textContent = poste || profession || "";
+      poleCell.appendChild(badge);
+      if (poste || profession) poleCell.appendChild(posteLine);
+
+      const contact = document.createElement("div");
+      contact.className = "memberMeta";
+      if (email) {
+        const line = document.createElement("div");
+        line.textContent = email;
+        contact.appendChild(line);
+      }
+      if (tel) {
+        const line = document.createElement("div");
+        line.textContent = tel;
+        contact.appendChild(line);
+      }
+      if (!email && !tel) {
+        const line = document.createElement("div");
+        line.textContent = "Contact non renseigne";
+        contact.appendChild(line);
+      }
+
+      row.appendChild(identity);
+      row.appendChild(poleCell);
+      row.appendChild(contact);
+      return row;
+    }
+
+    let membersCache = [];
+
+    function renderMembers(items){
+      const list = document.getElementById("membersList");
+      const count = document.getElementById("membersCount");
+      if (!list) return;
+      list.innerHTML = "";
+      if (!items.length) {
+        list.innerHTML = "<div class='membersEmpty'>Aucun membre disponible.</div>";
+        if (count) count.textContent = "0 membre";
+        return;
+      }
+      items.forEach(member => list.appendChild(buildMemberRow(member)));
+      if (count) {
+        count.textContent = `${items.length} membre${items.length > 1 ? "s" : ""}`;
+      }
+    }
+
+    function applyMembersFilters(){
+      const select = document.getElementById("membersPole");
+      const value = String(select?.value || "").toLowerCase();
+      const filtered = membersCache.filter(member => {
+        const pole = String(member.pole || "").trim().toLowerCase();
+        if (!value) return true;
+        return pole === value;
+      });
+      renderMembers(filtered);
+    }
+
+    function populatePoles(items){
+      const select = document.getElementById("membersPole");
+      if (!select) return;
+      const poles = Array.from(new Set(items.map(item => String(item.pole || "").trim()).filter(Boolean)));
+      poles.sort((a,b) => a.localeCompare(b));
+      poles.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+    }
+
+    async function loadMembers(){
+      const list = document.getElementById("membersList");
+      const count = document.getElementById("membersCount");
+      if (!list) return;
+      try {
+        const res = await fetch("api.php?route=members/list&limit=1000");
+        const data = await res.json();
+        membersCache = Array.isArray(data.items) ? data.items : [];
+        populatePoles(membersCache);
+        applyMembersFilters();
+      } catch {
+        list.innerHTML = "<div class='membersEmpty'>Impossible de charger les membres.</div>";
+        if (count) count.textContent = "Erreur chargement";
+      }
+    }
+
+    let speciesCache = [];
+
+    function statusTone(status){
+      const raw = String(status || "").trim();
+      if (!raw) return "";
+      const match = raw.match(/[A-Z]{2}/);
+      const code = (match ? match[0] : raw).toUpperCase();
+      if (code === "CR" || code === "EX" || code === "EW") return "danger";
+      if (code === "EN" || code === "VU" || code === "NT") return "warn";
+      if (code === "LC") return "ok";
+      return "";
+    }
+
+    function buildSpeciesCard(item){
+      const nomFr = String(item.nom_fr || "").trim();
+      const nomSc = String(item.nom_sc || "").trim();
+      const nomEn = String(item.english || "").trim();
+      const famille = String(item.famille || "").trim();
+      const wicode = String(item.wicode || "").trim();
+      const codeFr = String(item.code_fr || "").trim();
+      const statut = String(item.statut || "").trim();
+      const photo = String(item.photo || "").trim();
+
+      const card = document.createElement("article");
+      card.className = "speciesCard";
+
+      const media = document.createElement("div");
+      media.className = "speciesMedia";
+
+      if (photo) {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.src = photo;
+        img.alt = nomFr || nomSc || "Espece";
+        img.addEventListener("error", () => {
+          img.remove();
+          const fallback = document.createElement("div");
+          fallback.className = "speciesPlaceholder";
+          fallback.textContent = (nomFr || nomSc || "ES").slice(0,2).toUpperCase();
+          media.appendChild(fallback);
+        }, { once: true });
+        media.appendChild(img);
+      } else {
+        const fallback = document.createElement("div");
+        fallback.className = "speciesPlaceholder";
+        fallback.textContent = (nomFr || nomSc || "ES").slice(0,2).toUpperCase();
+        media.appendChild(fallback);
+      }
+
+      if (statut) {
+        const badge = document.createElement("div");
+        const tone = statusTone(statut);
+        badge.className = `speciesBadge ${tone ? `status-${tone}` : ""}`.trim();
+        badge.textContent = statut;
+        media.appendChild(badge);
+      }
+
+      const body = document.createElement("div");
+      body.className = "speciesBody";
+      const name = document.createElement("h3");
+      name.className = "speciesName";
+      name.textContent = nomFr || nomSc || "Espece";
+      const latin = document.createElement("p");
+      latin.className = "speciesLatin";
+      latin.textContent = nomSc || nomEn || "Nom scientifique non renseigne";
+
+      const tags = document.createElement("div");
+      tags.className = "speciesTags";
+      if (famille) {
+        const tag = document.createElement("span");
+        tag.className = "speciesTag";
+        tag.textContent = famille;
+        tags.appendChild(tag);
+      }
+      if (statut) {
+        const tag = document.createElement("span");
+        const tone = statusTone(statut);
+        tag.className = `speciesTag ${tone ? `status-${tone}` : ""}`.trim();
+        tag.textContent = `IUCN ${statut}`;
+        tags.appendChild(tag);
+      }
+
+      const info = document.createElement("div");
+      info.className = "speciesInfo";
+      const addLine = (label, value) => {
+        if (!value) return;
+        const line = document.createElement("div");
+        const strong = document.createElement("strong");
+        strong.textContent = `${label}: `;
+        const span = document.createElement("span");
+        span.textContent = value;
+        line.appendChild(strong);
+        line.appendChild(span);
+        info.appendChild(line);
+      };
+      addLine("Wicode", wicode);
+      addLine("Code fr", codeFr);
+      addLine("Nom anglais", nomEn);
+
+      body.appendChild(name);
+      body.appendChild(latin);
+      if (tags.children.length) body.appendChild(tags);
+      if (info.children.length) body.appendChild(info);
+
+      card.appendChild(media);
+      card.appendChild(body);
+      return card;
+    }
+
+    function renderSpecies(items){
+      const grid = document.getElementById("speciesGrid");
+      const count = document.getElementById("speciesCount");
+      if (!grid) return;
+      grid.innerHTML = "";
+      if (!items.length) {
+        grid.innerHTML = "<div class='speciesEmpty'>Aucune espece trouvee.</div>";
+        if (count) count.textContent = "0 espece";
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      items.forEach(item => frag.appendChild(buildSpeciesCard(item)));
+      grid.appendChild(frag);
+      if (count) count.textContent = `${items.length} espece${items.length > 1 ? "s" : ""}`;
+    }
+
+    function applySpeciesFilters(){
+      const search = document.getElementById("speciesSearch");
+      const family = document.getElementById("speciesFamily");
+      const query = String(search?.value || "").toLowerCase();
+      const familyValue = String(family?.value || "").toLowerCase();
+      const filtered = speciesCache.filter(item => {
+        const haystack = [
+          item.nom_fr,
+          item.nom_sc,
+          item.english,
+          item.wicode,
+          item.code_fr,
+          item.famille
+        ].join(" ").toLowerCase();
+        if (query && !haystack.includes(query)) return false;
+        if (familyValue && String(item.famille || "").toLowerCase() !== familyValue) return false;
+        return true;
+      });
+      renderSpecies(filtered);
+    }
+
+    function populateFamilies(items){
+      const select = document.getElementById("speciesFamily");
+      if (!select) return;
+      const families = Array.from(new Set(items.map(item => String(item.famille || "").trim()).filter(Boolean)));
+      families.sort((a,b) => a.localeCompare(b));
+      families.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+    }
+
+    async function loadSpecies(){
+      const grid = document.getElementById("speciesGrid");
+      const count = document.getElementById("speciesCount");
+      if (!grid) return;
+      try {
+        const res = await fetch("api.php?route=especes/list&limit=2000");
+        const data = await res.json();
+        speciesCache = Array.isArray(data.items) ? data.items : [];
+        populateFamilies(speciesCache);
+        applySpeciesFilters();
+        if (!speciesCache.length && count) count.textContent = "0 espece";
+      } catch {
+        grid.innerHTML = "<div class='speciesEmpty'>Impossible de charger les especes.</div>";
+        if (count) count.textContent = "Erreur chargement";
+      }
+    }
+
+    loadMembers();
+    loadSpecies();
+
+    const speciesSearch = document.getElementById("speciesSearch");
+    const speciesFamily = document.getElementById("speciesFamily");
+    if (speciesSearch) {
+      speciesSearch.addEventListener("input", () => {
+        applySpeciesFilters();
+      });
+    }
+    if (speciesFamily) {
+      speciesFamily.addEventListener("change", () => {
+        applySpeciesFilters();
+      });
+    }
+
+    const membersPole = document.getElementById("membersPole");
+    if (membersPole) {
+      membersPole.addEventListener("change", () => {
+        applyMembersFilters();
+      });
+    }
   </script>
 </body>
 </html>
+

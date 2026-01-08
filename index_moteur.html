@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Monitoring — Recherche + Carte + Stats</title>
+  <title>Monitoring â€” Recherche + Carte + Stats</title>
 
   <!-- MapLibre (WebGL) -->
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
@@ -11,91 +11,17 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <style>
-    :root{
-      --bg:#0b1020; --panel:#111a33; --panel2:#0f1730;
-      --text:#e8eeff; --muted:#aab6de; --border:rgba(255,255,255,.12);
-      --accent:#6aa6ff;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-    .app{display:grid;grid-template-columns:340px 1fr;height:100vh;overflow:hidden}
-    .sidebar{background:linear-gradient(180deg,var(--panel),var(--panel2));border-right:1px solid var(--border);padding:16px;overflow:auto}
-    .brand{display:flex;gap:10px;align-items:center;margin-bottom:12px}
-    .dot{width:12px;height:12px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(106,166,255,.6)}
-    .brand h1{font-size:16px;margin:0}
-    .brand p{margin:0;color:var(--muted);font-size:12px}
-    .card{border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,.03)}
-    .card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:700}
-    label{display:block;font-size:12px;color:var(--muted);margin:10px 0 6px}
-    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);outline:none}
-    select{color-scheme:dark}
-    select option{background:var(--panel);color:var(--text)}
-    input::placeholder{color:rgba(232,238,255,.45)}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .btns{display:flex;gap:10px;margin-top:12px}
-    button{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(106,166,255,.14);color:var(--text);cursor:pointer;font-weight:700}
-    button.secondary{background:rgba(255,255,255,.06)}
-    button:disabled{opacity:.55;cursor:not-allowed}
-    .hint{font-size:11px;color:var(--muted);line-height:1.4;margin:10px 0 0}
-    .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .kpi{border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(255,255,255,.03)}
-    .kpi .v{font-size:18px;font-weight:900}
-    .kpi .l{font-size:11px;color:var(--muted);margin-top:2px}
-
-    .main{display:grid;grid-template-rows:58px 1fr;overflow:hidden}
-    .topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
-    .tabs{display:flex;gap:8px}
-    .tab{padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);cursor:pointer;font-weight:800;font-size:13px;color:var(--muted);user-select:none}
-    .tab.active{color:var(--text);background:rgba(106,166,255,.16);box-shadow:0 0 0 2px rgba(106,166,255,.08) inset}
-    .status{font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.04)}
-    .pill.ok{border-color:rgba(106,166,255,.4);color:var(--text)}
-    .pill.error{border-color:rgba(255,122,122,.6);color:#ffd5d5;background:rgba(255,122,122,.12)}
-    .pill.loading{opacity:.8}
-
-    .content{position:relative;overflow:hidden}
-    .view{position:absolute;inset:0;display:none}
-    .view.active{display:block}
-    #map{width:100%;height:100%}
-
-    .tableWrap,.statsWrap{height:100%;overflow:auto;padding:14px}
-    table{width:100%;border-collapse:collapse;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:rgba(255,255,255,.03)}
-    th,td{padding:10px;border-bottom:1px solid var(--border);font-size:13px;text-align:left;vertical-align:top}
-    th{color:var(--muted);font-weight:800;background:rgba(255,255,255,.02);position:sticky;top:0}
-    tr:hover td{background:rgba(106,166,255,.06)}
-    .small{font-size:11px;color:var(--muted)}
-    .pagination{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px}
-    .pagination button{flex:unset;padding:8px 10px}
-
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .chartCard{border:1px solid var(--border);border-radius:14px;padding:12px;background:rgba(255,255,255,.03)}
-    .chartCard h3{margin:0 0 10px;font-size:13px;color:var(--muted)}
-    canvas{max-width:100%}
-
-    .maplibregl-popup-content{
-      background:rgba(17,26,51,.95);color:var(--text);border:1px solid var(--border);
-      border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.35);padding:10px;font-family:inherit
-    }
-    .maplibregl-popup-close-button{color:var(--muted)}
-    .popupTitle{font-weight:900;margin-bottom:4px}
-    .popupRow{font-size:12px;color:var(--muted);margin:2px 0}
-    .popupActions{display:flex;gap:8px;margin-top:8px}
-    .popupBtn{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:rgba(106,166,255,.16);color:var(--text);cursor:pointer;font-size:11px;font-weight:700}
-    .rowClickable td{cursor:pointer}
-    .notice{padding:14px}
-    .notice b{color:var(--text)}
-  </style>
+  <link rel="stylesheet" href="styles/app.css"/>
 </head>
 
-<body>
+<body class="page-moteur">
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
       <div class="dot"></div>
       <div>
         <h1>Explorer les observations</h1>
-        <p>Backend WAMP (PHP) · MapLibre (si WebGL actif)</p>
+        <p>Backend WAMP (PHP) Â· MapLibre (si WebGL actif)</p>
       </div>
     </div>
 
@@ -103,7 +29,7 @@
       <h2>Filtres</h2>
 
       <label>Recherche texte</label>
-      <input id="q" placeholder="Espèce, site, zone, famille, code..." />
+      <input id="q" placeholder="EspÃ¨ce, site, zone, famille, code..." />
 
       <label>Zone</label>
       <select id="zone">
@@ -120,7 +46,7 @@
 
       <div class="row">
         <div>
-          <label>Date début</label>
+          <label>Date dÃ©but</label>
           <input id="dateFrom" type="date"/>
         </div>
         <div>
@@ -142,22 +68,22 @@
 
       <div class="btns">
         <button id="btnSearch">Rechercher</button>
-        <button id="btnReset" class="secondary">Réinitialiser</button>
+        <button id="btnReset" class="secondary">RÃ©initialiser</button>
       </div>
 
       <p class="hint">
-        Les requêtes partent vers <b>api.php</b> avec <b>route=...</b>.
-        Si la carte ne marche pas (WebGL désactivé), utilise l’onglet Tableau/Statistiques.
+        Les requÃªtes partent vers <b>api.php</b> avec <b>route=...</b>.
+        Si la carte ne marche pas (WebGL dÃ©sactivÃ©), utilise lâ€™onglet Tableau/Statistiques.
       </p>
     </div>
 
     <div class="card">
-      <h2>Résumé</h2>
+      <h2>RÃ©sumÃ©</h2>
       <div class="kpis">
-        <div class="kpi"><div class="v" id="kpiObs">–</div><div class="l">Observations</div></div>
-        <div class="kpi"><div class="v" id="kpiSpecies">–</div><div class="l">Espèces uniques</div></div>
-        <div class="kpi"><div class="v" id="kpiSites">–</div><div class="l">Sites</div></div>
-        <div class="kpi"><div class="v" id="kpiZones">–</div><div class="l">Zones</div></div>
+        <div class="kpi"><div class="v" id="kpiObs">â€“</div><div class="l">Observations</div></div>
+        <div class="kpi"><div class="v" id="kpiSpecies">â€“</div><div class="l">EspÃ¨ces uniques</div></div>
+        <div class="kpi"><div class="v" id="kpiSites">â€“</div><div class="l">Sites</div></div>
+        <div class="kpi"><div class="v" id="kpiZones">â€“</div><div class="l">Zones</div></div>
       </div>
     </div>
   </aside>
@@ -170,7 +96,7 @@
         <div class="tab" data-tab="statsView">Statistiques</div>
       </div>
       <div class="status">
-        <span class="pill" id="resultPill">0 résultat</span>
+        <span class="pill" id="resultPill">0 rÃ©sultat</span>
         <span class="pill" id="netPill">API</span>
       </div>
     </div>
@@ -186,7 +112,7 @@
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Espèce / Titre</th>
+                <th>EspÃ¨ce / Titre</th>
                 <th>Famille</th>
                 <th>Zone</th>
                 <th>Site</th>
@@ -197,8 +123,8 @@
           </table>
           <div class="pagination">
             <span class="small" id="pageInfo">Page 1</span>
-            <button id="prevPage" class="secondary">◀</button>
-            <button id="nextPage" class="secondary">▶</button>
+            <button id="prevPage" class="secondary">â—€</button>
+            <button id="nextPage" class="secondary">â–¶</button>
           </div>
         </div>
       </div>
@@ -211,7 +137,7 @@
               <canvas id="chartTime"></canvas>
             </div>
             <div class="chartCard">
-              <h3>Top espèces (wiCode)</h3>
+              <h3>Top espÃ¨ces (wiCode)</h3>
               <canvas id="chartTopSpecies"></canvas>
             </div>
             <div class="chartCard">
@@ -223,7 +149,7 @@
               <canvas id="chartZones"></canvas>
             </div>
             <div class="chartCard">
-              <h3>Répartition par famille</h3>
+              <h3>RÃ©partition par famille</h3>
               <canvas id="chartFamilies"></canvas>
             </div>
           </div>
@@ -236,9 +162,9 @@
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 /** CONFIG **/
-const DEMO_MODE = false; // ✅ demandé
-const API_BASE = "api.php"; // ✅ demandé
-const NET_LABEL = DEMO_MODE ? "Mode démo" : "API";
+const DEMO_MODE = false; // âœ… demandÃ©
+const API_BASE = "api.php"; // âœ… demandÃ©
+const NET_LABEL = DEMO_MODE ? "Mode dÃ©mo" : "API";
 
 const SITE_COORDS_URL = "data/zone_coords.json";
 const SITE_COLORS = ["#4DD0E1","#26A69A","#66BB6A","#DCE775","#FFCA28","#FFA726","#FF7043","#EF5350","#EC407A","#AB47BC","#5C6BC0","#42A5F5"];
@@ -498,7 +424,7 @@ function collectFilters(){
 
 async function safeFetchJson(url){
   const res = await fetch(url);
-  const text = await res.text(); // <- lit le message même en cas d'erreur
+  const text = await res.text(); // <- lit le message mÃªme en cas d'erreur
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} on ${url}\n\n${text}`);
@@ -507,7 +433,7 @@ async function safeFetchJson(url){
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`Réponse non-JSON sur ${url}\n\n${text}`);
+    throw new Error(`RÃ©ponse non-JSON sur ${url}\n\n${text}`);
   }
 }
 
@@ -562,13 +488,13 @@ function shouldUseBboxForGeo(){
 
 /** KPI **/
 function updateKpis(k){
-  $("kpiObs").textContent = k.observations ?? "–";
-  $("kpiSpecies").textContent = k.species ?? "–";
-  $("kpiSites").textContent = k.sites ?? "–";
-  $("kpiZones").textContent = k.zones ?? "–";
+  $("kpiObs").textContent = k.observations ?? "â€“";
+  $("kpiSpecies").textContent = k.species ?? "â€“";
+  $("kpiSites").textContent = k.sites ?? "â€“";
+  $("kpiZones").textContent = k.zones ?? "â€“";
 }
 function setStatusPills(total){
-  $("resultPill").textContent = `${total} résultat${total>1?"s":""}`;
+  $("resultPill").textContent = `${total} rÃ©sultat${total>1?"s":""}`;
 }
 
 /** Table **/
@@ -578,7 +504,7 @@ function renderTable(data){
   const items = data.items || [];
   if (!items.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6" class="small">Aucun résultat</td>`;
+    tr.innerHTML = `<td colspan="6" class="small">Aucun rÃ©sultat</td>`;
     body.appendChild(tr);
   } else {
     items.forEach(row => {
@@ -609,7 +535,7 @@ function renderTable(data){
   const page = data.page ?? state.page;
   const pageSize = data.page_size ?? state.page_size;
   const total = data.total ?? 0;
-  $("pageInfo").textContent = `Page ${page} · ${pageSize}/page · Total ${total}`;
+  $("pageInfo").textContent = `Page ${page} Â· ${pageSize}/page Â· Total ${total}`;
   $("prevPage").disabled = (page <= 1);
   $("nextPage").disabled = (page * pageSize) >= total;
   setStatusPills(total);
@@ -715,7 +641,7 @@ let popup = null;
 const mapStyle = {
   version:8,
   glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap contributors" } },
+  sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"Â© OpenStreetMap contributors" } },
   layers:[{ id:"osm", type:"raster", source:"osm" }]
 };
 
@@ -1128,3 +1054,4 @@ function resetFilters(){
 </script>
 </body>
 </html>
+
