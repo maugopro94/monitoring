@@ -52,16 +52,18 @@ Ouvrir `http://localhost/monitoring/charge_suivi.html`.
 Ouvrir `http://localhost/monitoring/controle_qualite.html`.
 
 Profil "Charge de suivi" (role `charge_suivi`) - privileges principaux:
-- Authentification: inscription + connexion.
+- Authentification: inscription + connexion (pole obligatoire a l'inscription).
 - Soumission d'observations (formulaire inspire de `birds`) vers `observation_pending`.
 - Suivi de ses soumissions (etat: pending/approved/rejected).
 - Recherche et export PDF (impression) des resultats filtres.
-- Rapport: carte + statistiques apres recherche.
+- Rapport: carte + statistiques apres recherche + partage des resultats.
 - Partage des resultats par messagerie interne.
 - Messagerie temps reel (SSE) + pieces jointes.
 - Edition du profil (nom/email/telephone) et preferences UI.
+- Preferences: theme clair/sombre, notifications, langue.
 - Evolution statistique (comparaison de periodes).
 - Aide a la saisie: listes deroulantes (WiCode, code FR, nom FR, nom scientifique, anglais, famille) basees sur `birds`.
+- Deconnexion: retour a `index.html`.
 
 Profil "Controle qualite par pole" (role `controle_qualite`) - privileges principaux:
 - Meme base que `charge_suivi`.

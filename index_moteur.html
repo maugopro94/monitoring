@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Monitoring â€” Recherche + Carte + Stats</title>
+  <title>Monitoring — Recherche + Carte + Stats</title>
 
   <!-- MapLibre (WebGL) -->
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
@@ -11,17 +11,19 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
   <link rel="stylesheet" href="styles/app.css"/>
 </head>
 
 <body class="page-moteur">
-<div class="app">
-  <aside class="sidebar">
+<div class="app container-fluid px-0">
+  <div class="row g-0 appRow">
+    <aside class="sidebar col-12 col-lg-4 col-xl-3">
     <div class="brand">
       <div class="dot"></div>
       <div>
         <h1>Explorer les observations</h1>
-        <p>Backend WAMP (PHP) Â· MapLibre (si WebGL actif)</p>
+        <p>Backend WAMP (PHP) · MapLibre (si WebGL actif)</p>
       </div>
     </div>
 
@@ -29,7 +31,7 @@
       <h2>Filtres</h2>
 
       <label>Recherche texte</label>
-      <input id="q" placeholder="EspÃ¨ce, site, zone, famille, code..." />
+      <input id="q" placeholder="Espèce, site, zone, famille, code..." />
 
       <label>Zone</label>
       <select id="zone">
@@ -44,9 +46,9 @@
       <label>Famille</label>
       <input id="famille" placeholder="Ex: Ardeidae" />
 
-      <div class="row">
+      <div class="formRow">
         <div>
-          <label>Date dÃ©but</label>
+          <label>Date début</label>
           <input id="dateFrom" type="date"/>
         </div>
         <div>
@@ -55,7 +57,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div class="formRow">
         <div>
           <label>Effectif min</label>
           <input id="countMin" type="number" min="0" placeholder="0"/>
@@ -68,27 +70,27 @@
 
       <div class="btns">
         <button id="btnSearch">Rechercher</button>
-        <button id="btnReset" class="secondary">RÃ©initialiser</button>
+        <button id="btnReset" class="secondary">Réinitialiser</button>
       </div>
 
       <p class="hint">
-        Les requÃªtes partent vers <b>api.php</b> avec <b>route=...</b>.
-        Si la carte ne marche pas (WebGL dÃ©sactivÃ©), utilise lâ€™onglet Tableau/Statistiques.
+        Les requêtes partent vers <b>api.php</b> avec <b>route=...</b>.
+        Si la carte ne marche pas (WebGL désactivé), utilise l’onglet Tableau/Statistiques.
       </p>
     </div>
 
     <div class="card">
-      <h2>RÃ©sumÃ©</h2>
+      <h2>Résumé</h2>
       <div class="kpis">
-        <div class="kpi"><div class="v" id="kpiObs">â€“</div><div class="l">Observations</div></div>
-        <div class="kpi"><div class="v" id="kpiSpecies">â€“</div><div class="l">EspÃ¨ces uniques</div></div>
-        <div class="kpi"><div class="v" id="kpiSites">â€“</div><div class="l">Sites</div></div>
-        <div class="kpi"><div class="v" id="kpiZones">â€“</div><div class="l">Zones</div></div>
+        <div class="kpi"><div class="v" id="kpiObs">–</div><div class="l">Observations</div></div>
+        <div class="kpi"><div class="v" id="kpiSpecies">–</div><div class="l">Espèces uniques</div></div>
+        <div class="kpi"><div class="v" id="kpiSites">–</div><div class="l">Sites</div></div>
+        <div class="kpi"><div class="v" id="kpiZones">–</div><div class="l">Zones</div></div>
       </div>
     </div>
-  </aside>
+    </aside>
 
-  <main class="main">
+    <main class="main col-12 col-lg-8 col-xl-9">
     <div class="topbar">
       <div class="tabs">
         <div class="tab active" data-tab="mapView" id="tabMap">Carte</div>
@@ -96,7 +98,7 @@
         <div class="tab" data-tab="statsView">Statistiques</div>
       </div>
       <div class="status">
-        <span class="pill" id="resultPill">0 rÃ©sultat</span>
+        <span class="pill" id="resultPill">0 résultat</span>
         <span class="pill" id="netPill">API</span>
       </div>
     </div>
@@ -112,7 +114,7 @@
             <thead>
               <tr>
                 <th>Date</th>
-                <th>EspÃ¨ce / Titre</th>
+                <th>Espèce / Titre</th>
                 <th>Famille</th>
                 <th>Zone</th>
                 <th>Site</th>
@@ -123,8 +125,8 @@
           </table>
           <div class="pagination">
             <span class="small" id="pageInfo">Page 1</span>
-            <button id="prevPage" class="secondary">â—€</button>
-            <button id="nextPage" class="secondary">â–¶</button>
+            <button id="prevPage" class="secondary">◀</button>
+            <button id="nextPage" class="secondary">▶</button>
           </div>
         </div>
       </div>
@@ -137,7 +139,7 @@
               <canvas id="chartTime"></canvas>
             </div>
             <div class="chartCard">
-              <h3>Top espÃ¨ces (wiCode)</h3>
+              <h3>Top espèces (wiCode)</h3>
               <canvas id="chartTopSpecies"></canvas>
             </div>
             <div class="chartCard">
@@ -149,22 +151,23 @@
               <canvas id="chartZones"></canvas>
             </div>
             <div class="chartCard">
-              <h3>RÃ©partition par famille</h3>
+              <h3>Répartition par famille</h3>
               <canvas id="chartFamilies"></canvas>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </main>
+    </main>
+  </div>
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
 /** CONFIG **/
-const DEMO_MODE = false; // âœ… demandÃ©
-const API_BASE = "api.php"; // âœ… demandÃ©
-const NET_LABEL = DEMO_MODE ? "Mode dÃ©mo" : "API";
+const DEMO_MODE = false; // OK demandé
+const API_BASE = "api.php"; // OK demandé
+const NET_LABEL = DEMO_MODE ? "Mode démo" : "API";
 
 const SITE_COORDS_URL = "data/zone_coords.json";
 const SITE_COLORS = ["#4DD0E1","#26A69A","#66BB6A","#DCE775","#FFCA28","#FFA726","#FF7043","#EF5350","#EC407A","#AB47BC","#5C6BC0","#42A5F5"];
@@ -424,7 +427,7 @@ function collectFilters(){
 
 async function safeFetchJson(url){
   const res = await fetch(url);
-  const text = await res.text(); // <- lit le message mÃªme en cas d'erreur
+  const text = await res.text(); // <- lit le message même en cas d'erreur
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} on ${url}\n\n${text}`);
@@ -433,7 +436,7 @@ async function safeFetchJson(url){
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`RÃ©ponse non-JSON sur ${url}\n\n${text}`);
+    throw new Error(`Réponse non-JSON sur ${url}\n\n${text}`);
   }
 }
 
@@ -488,13 +491,13 @@ function shouldUseBboxForGeo(){
 
 /** KPI **/
 function updateKpis(k){
-  $("kpiObs").textContent = k.observations ?? "â€“";
-  $("kpiSpecies").textContent = k.species ?? "â€“";
-  $("kpiSites").textContent = k.sites ?? "â€“";
-  $("kpiZones").textContent = k.zones ?? "â€“";
+  $("kpiObs").textContent = k.observations ?? "–";
+  $("kpiSpecies").textContent = k.species ?? "–";
+  $("kpiSites").textContent = k.sites ?? "–";
+  $("kpiZones").textContent = k.zones ?? "–";
 }
 function setStatusPills(total){
-  $("resultPill").textContent = `${total} rÃ©sultat${total>1?"s":""}`;
+  $("resultPill").textContent = `${total} résultat${total>1?"s":""}`;
 }
 
 /** Table **/
@@ -504,7 +507,7 @@ function renderTable(data){
   const items = data.items || [];
   if (!items.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6" class="small">Aucun rÃ©sultat</td>`;
+    tr.innerHTML = `<td colspan="6" class="small">Aucun résultat</td>`;
     body.appendChild(tr);
   } else {
     items.forEach(row => {
@@ -535,7 +538,7 @@ function renderTable(data){
   const page = data.page ?? state.page;
   const pageSize = data.page_size ?? state.page_size;
   const total = data.total ?? 0;
-  $("pageInfo").textContent = `Page ${page} Â· ${pageSize}/page Â· Total ${total}`;
+  $("pageInfo").textContent = `Page ${page} · ${pageSize}/page · Total ${total}`;
   $("prevPage").disabled = (page <= 1);
   $("nextPage").disabled = (page * pageSize) >= total;
   setStatusPills(total);
@@ -641,7 +644,7 @@ let popup = null;
 const mapStyle = {
   version:8,
   glyphs:"https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"Â© OpenStreetMap contributors" } },
+  sources:{ osm:{ type:"raster", tiles:["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], tileSize:256, attribution:"© OpenStreetMap contributors" } },
   layers:[{ id:"osm", type:"raster", source:"osm" }]
 };
 
@@ -1049,9 +1052,17 @@ function resetFilters(){
 
   await initMap();
 
+  const handleResize = debounce(() => {
+    if (map) map.resize();
+  }, 150);
+  window.addEventListener("resize", handleResize);
+  window.addEventListener("orientationchange", handleResize);
+
   await runSearch();
 })();
 </script>
 </body>
 </html>
+
+
 

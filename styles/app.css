@@ -22,7 +22,8 @@
 }
 .page-shell *{box-sizing:border-box}
 .page-shell .hidden{display:none !important}
-.page-shell .app{display:grid;grid-template-columns:260px 1fr;height:100vh;overflow:hidden}
+.page-shell .app{width:100%}
+.page-shell .appRow{min-height:100vh}
 .page-shell .sidebar{background:var(--sidebar);border-right:1px solid rgba(255,255,255,.05);padding:16px;overflow:auto;color:var(--sidebarText)}
 .page-shell .brand{display:flex;gap:10px;align-items:center;margin-bottom:16px}
 .page-shell .dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(47,135,226,.5)}
@@ -77,7 +78,7 @@
 }
 .page-shell select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,135,226,.15)}
 .page-shell textarea{min-height:90px;resize:vertical}
-.page-shell .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.page-shell .formRow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .page-shell .btns{display:flex;gap:10px;margin-top:12px}
 .page-shell .btns.end{justify-content:flex-end}
 .page-shell .btns.end button{flex:unset}
@@ -209,12 +210,24 @@
   --profile-secondary-text:var(--text);
   --profile-secondary-hover:#2a3646;
   --button-light-text:var(--text);
+  color-scheme: dark;
 }
 .page-shell.theme-light{
+  --bg:#f4f7fb; --panel:#ffffff; --panel2:#f8fafc;
+  --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+  --label:#475569;
+  --field-bg:#f8fafc;
+  --profile-shadow:0 12px 24px rgba(15,23,42,.06);
+  --profile-secondary-bg:#eef2f6;
+  --profile-secondary-border:#d1d9e6;
+  --profile-secondary-text:#000;
+  --profile-secondary-hover:#e2e8f0;
+  --button-light-text:#000;
   --sidebar:#f8fafc;
   --sidebar2:#f1f5f9;
   --sidebarText:#1f2937;
   --sidebarMuted:#64748b;
+  color-scheme: light;
 }
 .page-shell.theme-dark .card,
 .page-shell.theme-dark .authCard,
@@ -351,7 +364,8 @@
   color:var(--text);
 }
 .page-moteur *{box-sizing:border-box}
-.page-moteur .app{display:grid;grid-template-columns:340px 1fr;height:100vh;overflow:hidden}
+.page-moteur .app{width:100%}
+.page-moteur .appRow{min-height:100vh}
 .page-moteur .sidebar{background:linear-gradient(180deg,var(--panel),var(--panel2));border-right:1px solid var(--border);padding:16px;overflow:auto}
 .page-moteur .brand{display:flex;gap:10px;align-items:center;margin-bottom:12px}
 .page-moteur .dot{width:12px;height:12px;border-radius:999px;background:var(--accent);box-shadow:0 0 16px rgba(106,166,255,.6)}
@@ -365,7 +379,7 @@
 .page-moteur select{color-scheme:dark}
 .page-moteur select option{background:var(--panel);color:var(--text)}
 .page-moteur input::placeholder{color:rgba(232,238,255,.45)}
-.page-moteur .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.page-moteur .formRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .page-moteur .btns{display:flex;gap:10px;margin-top:12px}
 .page-moteur button{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(106,166,255,.14);color:var(--text);cursor:pointer;font-weight:700}
 .page-moteur button.secondary{background:rgba(255,255,255,.06)}
@@ -429,3 +443,100 @@
 .page-export th,
 .page-export td{border:1px solid #ccc;padding:6px;font-size:11px;text-align:left}
 .page-export th{background:#f2f2f2}
+
+@media (max-width: 1100px){
+  .page-shell .app{grid-template-columns:220px 1fr}
+  .page-shell .chatLayout{grid-template-columns:200px 1fr}
+}
+
+@media (max-width: 1024px){
+  .page-shell .app{
+    height:auto;
+    min-height:100vh;
+  }
+  .page-shell .sidebar{
+    border-right:none;
+    border-bottom:1px solid var(--border);
+  }
+  .page-shell .nav{
+    grid-auto-flow:column;
+    grid-auto-columns:max-content;
+    overflow-x:auto;
+    padding-bottom:6px;
+  }
+  .page-shell .nav button{white-space:nowrap}
+  .page-shell .main{grid-template-rows:auto 1fr;overflow:visible}
+  .page-shell .topbar{
+    flex-direction:column;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .page-shell .userChip{width:100%;justify-content:space-between}
+  .page-shell .content{height:auto;overflow:visible}
+  .page-shell .view{
+    position:relative;
+    inset:auto;
+    min-height:0;
+    padding:16px;
+  }
+  .page-shell .formRow{grid-template-columns:1fr}
+  .page-shell .settingsLayout{grid-template-columns:1fr}
+  .page-shell .chatLayout{
+    grid-template-columns:1fr;
+    grid-template-rows:auto 1fr;
+    height:auto;
+  }
+  .page-shell .userList{max-height:200px}
+  .page-shell .chatPanel{min-height:360px}
+  .page-shell .tableWrap{max-height:300px}
+  .page-shell table{min-width:640px}
+  .page-shell .mapWrap{height:320px}
+  .page-shell .shareRow{grid-template-columns:1fr}
+  .page-shell .btns{flex-wrap:wrap}
+  .page-shell .authCard{width:100%;max-width:420px}
+}
+
+@media (max-width: 600px){
+  .page-shell .topbar{padding:14px}
+  .page-shell .view{padding:12px}
+  .page-shell .card{padding:12px}
+  .page-shell .chatComposer{grid-template-columns:1fr}
+  .page-shell .chatActions{justify-content:flex-end}
+  .page-shell .chatComposer .sendBtn,
+  .page-shell .chatComposer .attachBtn{min-width:72px}
+  .page-shell .tableWrap{max-height:260px}
+  .page-shell .mapWrap{height:260px}
+}
+
+@media (max-width: 1024px){
+  .page-moteur .app{
+    height:auto;
+    min-height:100vh;
+  }
+  .page-moteur .sidebar{
+    border-right:none;
+    border-bottom:1px solid var(--border);
+  }
+  .page-moteur .main{grid-template-rows:auto 1fr;overflow:visible}
+  .page-moteur .content{overflow:visible}
+  .page-moteur .view{position:relative;inset:auto}
+  .page-moteur .tabs{flex-wrap:wrap}
+  .page-moteur .formRow{grid-template-columns:1fr}
+  .page-moteur .tableWrap,
+  .page-moteur .statsWrap{padding:10px}
+  .page-moteur .grid2{grid-template-columns:1fr}
+  .page-moteur .pagination{justify-content:center;flex-wrap:wrap}
+  .page-moteur #map{height:60vh;min-height:320px}
+}
+
+@media (max-width: 700px){
+  .page-landing .hero{padding:32px 20px}
+  .page-landing .cards{grid-template-columns:1fr}
+  .page-landing .membersRow{grid-template-columns:1fr;gap:6px}
+  .page-landing .membersRow.header{display:none}
+  .page-landing .speciesGrid{grid-template-columns:1fr}
+  .page-landing .membersToolbar{flex-direction:column;align-items:flex-start}
+  .page-landing .speciesToolbar{flex-direction:column;align-items:flex-start}
+  .page-landing .actions{width:100%}
+  .page-landing .btn{width:100%}
+}

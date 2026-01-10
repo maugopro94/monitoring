@@ -10,6 +10,7 @@
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
   <link rel="stylesheet" href="styles/app.css"/>
 </head>
 <body class="page-shell page-charge">
@@ -48,8 +49,9 @@
     </div>
   </div>
 
-  <div id="appView" class="app hidden">
-    <aside class="sidebar">
+  <div id="appView" class="app container-fluid px-0 hidden">
+    <div class="row g-0 appRow">
+      <aside class="sidebar col-12 col-lg-3 col-xl-2">
       <div class="brand">
         <div class="dot"></div>
         <div>
@@ -74,9 +76,9 @@
           <button class="tab" data-tab="profileView">Parametres</button>
         </div>
       </div>
-    </aside>
+      </aside>
 
-    <main class="main">
+      <main class="main col-12 col-lg-9 col-xl-10">
       <div class="topbar">
         <div class="titleBlock">
           <div class="pageTitle" id="pageTitle">Observations</div>
@@ -95,7 +97,7 @@
         <div id="submitView" class="view active">
           <div class="card">
             <h2>Nouvelle observation (soumission)</h2>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Date</label>
                 <input id="obsDate" type="date"/>
@@ -105,7 +107,7 @@
                 <input id="obsEffectif" type="number" min="0" placeholder="0"/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Zone</label>
                 <select id="obsZone"><option value="">-- Zone --</option></select>
@@ -115,7 +117,7 @@
                 <select id="obsSite"><option value="">-- Site --</option></select>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>WiCode</label>
                 <input id="obsWiCode" list="wicodeList" placeholder="Ex: EGRGA"/>
@@ -125,7 +127,7 @@
                 <input id="obsCodeFr" list="codeFrList" placeholder="Ex: aiggar"/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Nom francais</label>
                 <input id="obsNomFr" list="nomFrList" placeholder="Aigrette garzette"/>
@@ -135,7 +137,7 @@
                 <input id="obsNomSc" list="nomScList" placeholder="Egretta garzetta"/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Nom anglais</label>
                 <input id="obsEnglish" list="englishList" placeholder="Little Egret"/>
@@ -151,7 +153,7 @@
             <datalist id="nomScList"></datalist>
             <datalist id="englishList"></datalist>
             <datalist id="familleList"></datalist>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Transect</label>
                 <input id="obsTransect" placeholder=""/>
@@ -161,7 +163,7 @@
                 <input id="obsPoint" placeholder=""/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>UTM</label>
                 <input id="obsUtm" placeholder=""/>
@@ -171,7 +173,7 @@
                 <input id="obsStatut" placeholder="LC/NT/EN..."/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Latitude</label>
                 <input id="obsLat" placeholder="14.72"/>
@@ -181,7 +183,7 @@
                 <input id="obsLon" placeholder="-17.18"/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Observateurs</label>
                 <input id="obsObservateurs" placeholder="Nom de l'observateur"/>
@@ -245,7 +247,7 @@
             <h2>Recherche & Export</h2>
             <label>Recherche texte</label>
             <input id="searchQ" placeholder="Espece, site, zone, famille, code..."/>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Zone</label>
                 <select id="searchZone"><option value="">Toutes</option></select>
@@ -255,7 +257,7 @@
                 <select id="searchSite"><option value="">Tous</option></select>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Date debut</label>
                 <input id="searchDateFrom" type="date"/>
@@ -265,7 +267,7 @@
                 <input id="searchDateTo" type="date"/>
               </div>
             </div>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Effectif min</label>
                 <input id="searchMin" type="number" min="0"/>
@@ -356,7 +358,7 @@
 
           <div class="card">
             <h2>Comparaison evolution</h2>
-            <div class="row">
+            <div class="formRow">
               <div>
                 <label>Date debut</label>
                 <input id="evoDateFrom" type="date"/>
@@ -410,7 +412,7 @@
               <div id="profileSection" class="settingsPane active">
                 <div class="card">
                   <div class="cardHeader">Informations du profil</div>
-                  <div class="row">
+                  <div class="formRow">
                     <div>
                       <label>Prenom</label>
                       <input id="profileFirstName" placeholder="Prenom"/>
@@ -506,7 +508,8 @@
           </div>
         </div>
       </div>
-    </main>
+      </main>
+    </div>
   </div>
 
 <script>
@@ -1349,6 +1352,7 @@ async function loadReportMap(filters) {
 let evoChart = null;
 let reportStatsChart = null;
 let reportMap = null;
+let reportMapResizeTimer = null;
 const reportMapStyle = {
   version: 8,
   glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
@@ -1370,6 +1374,17 @@ function setReportVisibility(hasData) {
     setTimeout(() => reportMap.resize(), 50);
   }
 }
+
+function scheduleReportMapResize() {
+  if (!reportMap) return;
+  if (reportMapResizeTimer) clearTimeout(reportMapResizeTimer);
+  reportMapResizeTimer = setTimeout(() => {
+    if (reportMap) reportMap.resize();
+  }, 150);
+}
+
+window.addEventListener("resize", scheduleReportMapResize);
+window.addEventListener("orientationchange", scheduleReportMapResize);
 
 function updateShareUsers(users) {
   const sel = $("shareUser");
@@ -1767,4 +1782,6 @@ checkAuth();
 </script>
 </body>
 </html>
+
+
 
