@@ -1133,13 +1133,331 @@ function list_members(array $params = []): array
     $limit = max(1, min($limit, 1000));
     $pdo = db();
     $sql = 'SELECT id, prenom, nom, pole, poste, telephone, email, photo, profession, slug
-            FROM members
-            ORDER BY id ASC
+            FROM members';
+    if (members_has_column('adhesion_status')) {
+        $sql .= " WHERE adhesion_status IS NULL OR adhesion_status = 'active'";
+    }
+    $sql .= ' ORDER BY id ASC
             LIMIT :limit';
     $st = $pdo->prepare($sql);
     $st->bindValue(':limit', $limit, PDO::PARAM_INT);
     $st->execute();
     return $st->fetchAll();
+}
+
+function members_has_column(string $column): bool
+{
+    static $cache = [];
+    if (array_key_exists($column, $cache)) {
+        return $cache[$column];
+    }
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT 1 FROM information_schema.columns WHERE table_schema = :schema AND table_name = :table AND column_name = :col');
+        $st->execute([
+            ':schema' => DB_NAME,
+            ':table' => 'members',
+            ':col' => $column,
+        ]);
+        $cache[$column] = (bool)$st->fetchColumn();
+    } catch (Throwable $e) {
+        $cache[$column] = false;
+    }
+    return $cache[$column];
+}
+
+function next_member_id(): int
+{
+    $pdo = db();
+    $id = (int)$pdo->query('SELECT COALESCE(MAX(id), 0) + 1 FROM members')->fetchColumn();
+    return max(1, $id);
+}
+
+function membership_amount(string $type): int
+{
+    return $type === 'student' ? 5000 : 10000;
+}
+
+function fetch_member_by_email(string $email): ?array
+{
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM members WHERE email = :email ORDER BY id DESC LIMIT 1');
+    $st->execute([':email' => $email]);
+    $row = $st->fetch();
+    return $row ?: null;
+}
+
+function generate_temp_password(int $length = 8): string
+{
+    $pool = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $max = strlen($pool) - 1;
+    $password = '';
+    for ($i = 0; $i < $length; $i++) {
+        $password .= $pool[random_int(0, $max)];
+    }
+    return $password;
+}
+
+function ensure_member_user_account(array $member, array $actor): array
+{
+    $email = trim((string)($member['email'] ?? ''));
+    if ($email === '') {
+        api_error('Member email missing', 422);
+    }
+    $pdo = db();
+    $existing = fetch_user_by_email($email);
+    $now = now_ts();
+    $tempPassword = null;
+    if ($existing) {
+        if (($existing['role'] ?? '') !== 'member') {
+            api_error('Email already used', 409);
+        }
+        $st = $pdo->prepare('UPDATE users SET pole = :pole, status = :status, updated_at = :updated_at WHERE id = :id');
+        $st->execute([
+            ':pole' => normalize_zone_key((string)($member['pole'] ?? '')) ?: null,
+            ':status' => 'active',
+            ':updated_at' => $now,
+            ':id' => (int)$existing['id'],
+        ]);
+        return ['user_id' => (int)$existing['id'], 'temp_password' => null];
+    }
+
+    $passwordHash = (string)($member['password_hash'] ?? '');
+    if ($passwordHash === '') {
+        $tempPassword = generate_temp_password();
+        $passwordHash = password_hash($tempPassword, PASSWORD_DEFAULT);
+    }
+    $fullName = trim((string)($member['prenom'] ?? '') . ' ' . (string)($member['nom'] ?? ''));
+    $st = $pdo->prepare('INSERT INTO users (full_name, email, phone, pole, role, password_hash, status, created_at, updated_at) VALUES (:full_name, :email, :phone, :pole, :role, :password_hash, :status, :created_at, :updated_at)');
+    $st->execute([
+        ':full_name' => $fullName !== '' ? $fullName : $email,
+        ':email' => $email,
+        ':phone' => (string)($member['telephone'] ?? '') ?: null,
+        ':pole' => normalize_zone_key((string)($member['pole'] ?? '')) ?: null,
+        ':role' => 'member',
+        ':password_hash' => $passwordHash,
+        ':status' => 'active',
+        ':created_at' => $now,
+        ':updated_at' => $now,
+    ]);
+    return ['user_id' => (int)$pdo->lastInsertId(), 'temp_password' => $tempPassword];
+}
+
+function create_membership_request(array $data): array
+{
+    $prenom = trim((string)($data['prenom'] ?? ''));
+    $nom = trim((string)($data['nom'] ?? ''));
+    $email = trim((string)($data['email'] ?? ''));
+    $telephone = trim((string)($data['telephone'] ?? ''));
+    $pole = trim((string)($data['pole'] ?? ''));
+    $fonction = trim((string)($data['fonction'] ?? ''));
+    $organisation = trim((string)($data['organisation'] ?? ''));
+    $password = (string)($data['password'] ?? '');
+    $type = trim((string)($data['adhesion_type'] ?? ''));
+    if ($prenom === '' || $nom === '' || $email === '' || $telephone === '' || $pole === '' || $fonction === '' || $organisation === '' || $type === '' || $password === '') {
+        api_error('Missing required fields', 422);
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        api_error('Invalid email', 422);
+    }
+    if (strlen($password) < 6) {
+        api_error('Password too short', 422);
+    }
+    $type = strtolower($type);
+    if (!in_array($type, ['student', 'professional'], true)) {
+        api_error('Invalid adhesion_type', 422);
+    }
+    if (fetch_user_by_email($email)) {
+        api_error('Email already used', 409);
+    }
+    $existing = fetch_member_by_email($email);
+    if ($existing && in_array(($existing['adhesion_status'] ?? ''), ['pending_payment', 'paid', 'pending_activation', 'active'], true)) {
+        api_error('Member already exists', 409);
+    }
+    $memberId = next_member_id();
+    $amount = membership_amount($type);
+    $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+    $now = now_ts();
+    $pdo = db();
+    $stmt = $pdo->prepare('INSERT INTO members (id, prenom, nom, pole, poste, telephone, email, photo, profession, slug, fonction, organisation, adhesion_type, adhesion_amount, adhesion_currency, adhesion_status, paid_at, activated_by, activated_at, expires_at, password_hash, user_id, created_at, updated_at) VALUES (:id, :prenom, :nom, :pole, :poste, :telephone, :email, :photo, :profession, :slug, :fonction, :organisation, :adhesion_type, :adhesion_amount, :adhesion_currency, :adhesion_status, :paid_at, :activated_by, :activated_at, :expires_at, :password_hash, :user_id, :created_at, :updated_at)');
+    $stmt->execute([
+        ':id' => $memberId,
+        ':prenom' => $prenom,
+        ':nom' => $nom,
+        ':pole' => normalize_zone_key($pole),
+        ':poste' => $fonction,
+        ':telephone' => $telephone,
+        ':email' => $email,
+        ':photo' => '',
+        ':profession' => $organisation,
+        ':slug' => (string)$memberId,
+        ':fonction' => $fonction,
+        ':organisation' => $organisation,
+        ':adhesion_type' => $type,
+        ':adhesion_amount' => $amount,
+        ':adhesion_currency' => 'XOF',
+        ':adhesion_status' => 'pending_payment',
+        ':paid_at' => null,
+        ':activated_by' => null,
+        ':activated_at' => null,
+        ':expires_at' => null,
+        ':password_hash' => $passwordHash,
+        ':user_id' => null,
+        ':created_at' => $now,
+        ':updated_at' => $now,
+    ]);
+    return [
+        'id' => $memberId,
+        'prenom' => $prenom,
+        'nom' => $nom,
+        'email' => $email,
+        'pole' => normalize_zone_key($pole),
+        'adhesion_type' => $type,
+        'adhesion_amount' => $amount,
+        'adhesion_currency' => 'XOF',
+        'adhesion_status' => 'pending_payment'
+    ];
+}
+
+function list_membership_requests(array $params, array $actor): array
+{
+    $role = $actor['role'] ?? '';
+    if (!in_array($role, ['controle_qualite', 'admin'], true)) {
+        api_error('Forbidden', 403);
+    }
+    $statuses = [];
+    $rawStatus = trim((string)($params['status'] ?? ''));
+    $allowed = ['pending_payment', 'paid', 'pending_activation', 'active', 'rejected'];
+    if ($rawStatus !== '') {
+        foreach (explode(',', $rawStatus) as $item) {
+            $item = trim($item);
+            if ($item !== '' && in_array($item, $allowed, true)) {
+                $statuses[] = $item;
+            }
+        }
+    } else {
+        $statuses = ['pending_payment', 'paid', 'pending_activation'];
+    }
+
+    $limit = isset($params['limit']) ? (int)$params['limit'] : 200;
+    $limit = max(1, min($limit, 500));
+
+    $sql = 'SELECT id, prenom, nom, pole, telephone, email, fonction, organisation, adhesion_type, adhesion_amount, adhesion_currency, adhesion_status, paid_at, created_at
+            FROM members WHERE 1=1';
+    $bind = [];
+    if ($statuses) {
+        $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+        $sql .= " AND adhesion_status IN ($placeholders)";
+        $bind = array_merge($bind, $statuses);
+    }
+    if ($role === 'controle_qualite') {
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        $sql .= ' AND UPPER(TRIM(pole)) = ?';
+        $bind[] = normalize_zone_key($pole);
+    } elseif (!empty($params['pole'])) {
+        $sql .= ' AND UPPER(TRIM(pole)) = ?';
+        $bind[] = normalize_zone_key((string)$params['pole']);
+    }
+    $sql .= ' ORDER BY created_at DESC, id DESC LIMIT ' . $limit;
+
+    $pdo = db();
+    $st = $pdo->prepare($sql);
+    $st->execute($bind);
+    return $st->fetchAll();
+}
+
+function approve_membership(int $id, array $actor, bool $markPaid = true): array
+{
+    $role = $actor['role'] ?? '';
+    if (!in_array($role, ['controle_qualite', 'admin'], true)) {
+        api_error('Forbidden', 403);
+    }
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM members WHERE id = :id');
+    $st->execute([':id' => $id]);
+    $member = $st->fetch();
+    if (!$member) {
+        api_error('Member not found', 404);
+    }
+    if ($role === 'controle_qualite') {
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        if (normalize_zone_key((string)$member['pole']) !== normalize_zone_key($pole)) {
+            api_error('Forbidden', 403);
+        }
+    }
+    $now = now_ts();
+    $paidAt = $markPaid && empty($member['paid_at']) ? $now : $member['paid_at'];
+    $pdo->beginTransaction();
+    try {
+        $userInfo = ensure_member_user_account($member, $actor);
+        $userId = $userInfo['user_id'] ?? null;
+        $sql = 'UPDATE members SET adhesion_status = :status, paid_at = :paid_at, activated_by = :activated_by, activated_at = :activated_at, updated_at = :updated_at';
+        if (members_has_column('user_id')) {
+            $sql .= ', user_id = :user_id';
+        }
+        $sql .= ' WHERE id = :id';
+        $update = $pdo->prepare($sql);
+        $bind = [
+            ':status' => 'active',
+            ':paid_at' => $paidAt,
+            ':activated_by' => (int)$actor['id'],
+            ':activated_at' => $now,
+            ':updated_at' => $now,
+            ':id' => $id,
+        ];
+        if (members_has_column('user_id')) {
+            $bind[':user_id'] = $userId;
+        }
+        $update->execute($bind);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+    $response = ['id' => $id, 'status' => 'active', 'user_id' => $userId];
+    if (!empty($userInfo['temp_password'])) {
+        $response['temp_password'] = $userInfo['temp_password'];
+    }
+    return $response;
+}
+
+function reject_membership(int $id, array $actor, string $reason): array
+{
+    $role = $actor['role'] ?? '';
+    if (!in_array($role, ['controle_qualite', 'admin'], true)) {
+        api_error('Forbidden', 403);
+    }
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM members WHERE id = :id');
+    $st->execute([':id' => $id]);
+    $member = $st->fetch();
+    if (!$member) {
+        api_error('Member not found', 404);
+    }
+    if ($role === 'controle_qualite') {
+        $pole = trim((string)($actor['pole'] ?? ''));
+        if ($pole === '') {
+            api_error('Pole missing', 422);
+        }
+        if (normalize_zone_key((string)$member['pole']) !== normalize_zone_key($pole)) {
+            api_error('Forbidden', 403);
+        }
+    }
+    $now = now_ts();
+    $update = $pdo->prepare('UPDATE members SET adhesion_status = :status, rejection_reason = :reason, updated_at = :updated_at WHERE id = :id');
+    $update->execute([
+        ':status' => 'rejected',
+        ':reason' => $reason !== '' ? $reason : null,
+        ':updated_at' => $now,
+        ':id' => $id,
+    ]);
+    return ['id' => $id, 'status' => 'rejected'];
 }
 
 /**

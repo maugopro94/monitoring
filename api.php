@@ -17,7 +17,8 @@ function apply_qc_scope_params(array $params): array
         return $params;
     }
     $user = fetch_user_by_id((int)$_SESSION['user_id']);
-    if (!$user || ($user['role'] ?? '') !== 'controle_qualite') {
+    $role = $user['role'] ?? '';
+    if (!$user || !in_array($role, ['controle_qualite', 'member'], true)) {
         return $params;
     }
     $pole = trim((string)($user['pole'] ?? ''));
@@ -78,6 +79,45 @@ try {
             header('Content-Type: application/json; charset=utf-8');
             $items = list_especes($params);
             echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'membership/request':
+            header('Content-Type: application/json; charset=utf-8');
+            $result = create_membership_request($params);
+            echo json_encode(['member' => $result], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'membership/list':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = require_session_user(['controle_qualite', 'admin']);
+            $items = list_membership_requests($params, $actor);
+            echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+            break;
+        case 'membership/approve':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = require_session_user(['controle_qualite', 'admin']);
+            $id = isset($params['id']) ? (int)$params['id'] : 0;
+            if ($id <= 0) {
+                throw new ApiException('Missing id', 422);
+            }
+            $markPaid = true;
+            if (array_key_exists('mark_paid', $params)) {
+                $markPaid = filter_var($params['mark_paid'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($markPaid === null) {
+                    $markPaid = (bool)$params['mark_paid'];
+                }
+            }
+            $result = approve_membership($id, $actor, $markPaid);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
+            break;
+        case 'membership/reject':
+            header('Content-Type: application/json; charset=utf-8');
+            $actor = require_session_user(['controle_qualite', 'admin']);
+            $id = isset($params['id']) ? (int)$params['id'] : 0;
+            if ($id <= 0) {
+                throw new ApiException('Missing id', 422);
+            }
+            $reason = trim((string)($params['reason'] ?? ''));
+            $result = reject_membership($id, $actor, $reason);
+            echo json_encode($result, JSON_UNESCAPED_UNICODE);
             break;
         case 'observations/export':
             $items = q_observations_export(apply_qc_scope_params($params));
@@ -141,13 +181,13 @@ try {
             break;
         case 'pending/create':
             header('Content-Type: application/json; charset=utf-8');
-            $user = require_session_user();
+            $user = require_session_user(['charge_suivi', 'controleur', 'controle_qualite', 'admin']);
             $result = create_pending_observation($params, $user);
             echo json_encode($result, JSON_UNESCAPED_UNICODE);
             break;
         case 'pending/list':
             header('Content-Type: application/json; charset=utf-8');
-            $user = require_session_user();
+            $user = require_session_user(['charge_suivi', 'controleur', 'controle_qualite', 'admin']);
             $items = list_pending_observations($params, $user);
             echo json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
             break;
@@ -237,6 +277,10 @@ try {
                     'filters/zones'       => 'List of available zones',
                     'filters/sites'       => 'List of available sites (optionally filtered by zone)',
                     'especes/list'        => 'List species catalog',
+                    'membership/request'  => 'Submit a membership request',
+                    'membership/list'     => 'List membership requests (controle_qualite/admin)',
+                    'membership/approve'  => 'Activate membership (controle_qualite/admin)',
+                    'membership/reject'   => 'Reject membership (controle_qualite/admin)',
                     'auth/register'       => 'Register user',
                     'auth/login'          => 'Login user',
                     'auth/logout'         => 'Logout user',

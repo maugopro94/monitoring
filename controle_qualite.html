@@ -73,6 +73,7 @@
         <div class="nav">
           <button class="tab active" data-tab="submitView">Observations</button>
           <button class="tab" data-tab="reviewView" id="tabReview">Statuts</button>
+          <button class="tab" data-tab="membershipView" id="tabMembership">Adhesions</button>
           <button class="tab" data-tab="searchView">Rapports</button>
           <button class="tab" data-tab="chatView">Messagerie</button>
           <button class="tab" data-tab="profileView">Parametres</button>
@@ -242,6 +243,55 @@
               </thead>
               <tbody id="reviewBody"></tbody>
             </table>
+          </div>
+        </div>
+        <div id="membershipView" class="view">
+          <div class="card">
+            <h2>Demandes d'adhesion</h2>
+            <div class="formRow">
+              <div>
+                <label>Statut</label>
+                <select id="membershipStatus">
+                  <option value="pending_payment,paid,pending_activation">En attente</option>
+                  <option value="pending_payment">En attente paiement</option>
+                  <option value="paid">Paiement confirme</option>
+                  <option value="pending_activation">En attente activation</option>
+                  <option value="active">Actifs</option>
+                  <option value="rejected">Rejetes</option>
+                  <option value="">Tous</option>
+                </select>
+              </div>
+              <div>
+                <label>Pole</label>
+                <input id="membershipPole" placeholder="Tous les poles" list="membershipPoleOptions"/>
+                <datalist id="membershipPoleOptions"></datalist>
+              </div>
+            </div>
+            <div class="btns">
+              <button id="btnMembershipRefresh" class="secondary">Actualiser</button>
+            </div>
+            <div id="membershipStatusMsg" class="status"></div>
+          </div>
+          <div class="card">
+            <h2>Liste des demandes</h2>
+            <div class="tableWrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Nom</th>
+                    <th>Pole</th>
+                    <th>Type</th>
+                    <th>Montant</th>
+                    <th>Telephone</th>
+                    <th>Email</th>
+                    <th>Statut</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="membershipBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -542,6 +592,7 @@ const CHAT_LAST_USER_KEY = "chat_last_user_id";
 const pageMeta = {
   submitView: { title: "Observations", subtitle: "Gestion des observations" },
   reviewView: { title: "Statuts", subtitle: "Validation des observations" },
+  membershipView: { title: "Adhesions", subtitle: "Activation des membres" },
   searchView: { title: "Rapports", subtitle: "Recherche et export" },
   chatView: { title: "Messagerie", subtitle: "Echanges entre membres" },
   profileView: { title: "Parametres", subtitle: "Informations du profil" }
@@ -554,6 +605,9 @@ function setTab(tabId) {
   updatePageMeta(tabId);
   if (tabId === "searchView" && reportMap) {
     setTimeout(() => reportMap.resize(), 80);
+  }
+  if (tabId === "membershipView") {
+    loadMembershipRequests();
   }
 }
 
@@ -862,6 +916,18 @@ function renderUserInfo() {
   $("userRole").textContent = state.user.role || "";
   $("userAvatar").textContent = getInitials(state.user.full_name || "");
   applyProfileFields();
+  applyMembershipControls();
+}
+
+function applyMembershipControls() {
+  const poleInput = $("membershipPole");
+  if (!poleInput || !state.user) return;
+  if (state.user.role === "controle_qualite") {
+    poleInput.value = state.user.pole || "";
+    poleInput.disabled = true;
+  } else {
+    poleInput.disabled = false;
+  }
 }
 
 async function checkAuth() {
@@ -889,6 +955,11 @@ function setupRoleViews() {
   const reviewTab = $("tabReview");
   if (reviewTab) {
     reviewTab.classList.toggle("hidden", !canReview);
+  }
+  const canMembership = ["controle_qualite", "admin"].includes(state.user.role);
+  const membershipTab = $("tabMembership");
+  if (membershipTab) {
+    membershipTab.classList.toggle("hidden", !canMembership);
   }
 }
 
@@ -1010,7 +1081,7 @@ async function loadZones() {
 async function loadPoleOptions() {
   try {
     const zones = await apiGet("filters/zones");
-    ["poleOptions", "profilePoleOptions"].forEach(id => {
+    ["poleOptions", "profilePoleOptions", "membershipPoleOptions"].forEach(id => {
       const list = $(id);
       if (!list) return;
       list.innerHTML = "";
@@ -1192,6 +1263,109 @@ async function loadReviewList() {
   } catch (err) {
     $("reviewHint").textContent = "Acces refuse.";
   }
+}
+
+const membershipStatusLabels = {
+  pending_payment: "Paiement en attente",
+  paid: "Paiement confirme",
+  pending_activation: "Activation en attente",
+  active: "Actif",
+  rejected: "Rejete"
+};
+
+const membershipTypeLabels = {
+  student: "Etudiant",
+  professional: "Professionnel"
+};
+
+const membershipStatusClasses = {
+  pending_payment: "warn",
+  paid: "info",
+  pending_activation: "warn",
+  active: "ok",
+  rejected: "bad"
+};
+
+function formatMembershipAmount(amount, currency) {
+  const value = Number(amount || 0);
+  if (!value) return "";
+  return `${value.toLocaleString("fr-FR")} ${currency || "XOF"}`;
+}
+
+async function loadMembershipRequests() {
+  const statusEl = $("membershipStatus");
+  const poleEl = $("membershipPole");
+  const status = statusEl ? statusEl.value : "";
+  const effectiveStatus = status === "" ? "pending_payment,paid,pending_activation,active,rejected" : status;
+  const pole = poleEl ? poleEl.value.trim() : "";
+  const statusMsg = $("membershipStatusMsg");
+  if (statusMsg) statusMsg.textContent = "";
+  try {
+    const res = await apiGet("membership/list", { status: effectiveStatus, pole });
+    const body = $("membershipBody");
+    if (!body) return;
+    body.innerHTML = "";
+    (res.items || []).forEach(item => {
+      const statusKey = item.adhesion_status || "pending_payment";
+      const label = membershipStatusLabels[statusKey] || statusKey;
+      const pillClass = membershipStatusClasses[statusKey] || "warn";
+      const typeLabel = membershipTypeLabels[item.adhesion_type] || item.adhesion_type || "";
+      const name = `${item.prenom || ""} ${item.nom || ""}`.trim();
+      const amount = formatMembershipAmount(item.adhesion_amount, item.adhesion_currency);
+      const canActivate = ["pending_payment", "paid", "pending_activation"].includes(statusKey);
+      const canReject = !["active", "rejected"].includes(statusKey);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${item.created_at || ""}</td>
+        <td>${escapeHtml(name)}</td>
+        <td>${item.pole || ""}</td>
+        <td>${typeLabel}</td>
+        <td>${amount}</td>
+        <td>${item.telephone || ""}</td>
+        <td>${item.email || ""}</td>
+        <td><span class="pill ${pillClass}">${label}</span></td>
+        <td>
+          <button class="secondary" data-membership-approve="${item.id}" ${canActivate ? "" : "disabled"}>Activer</button>
+          <button class="ghost" data-membership-reject="${item.id}" ${canReject ? "" : "disabled"}>Rejeter</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+    body.querySelectorAll("[data-membership-approve]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.membershipApprove);
+        const res = await apiPost("membership/approve", { id, mark_paid: true });
+        if (res && res.temp_password) {
+          alert(`Compte active. Mot de passe provisoire: ${res.temp_password}`);
+        }
+        await loadMembershipRequests();
+      });
+    });
+    body.querySelectorAll("[data-membership-reject]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = Number(btn.dataset.membershipReject);
+        const reason = prompt("Motif du rejet (optionnel):") || "";
+        await apiPost("membership/reject", { id, reason });
+        await loadMembershipRequests();
+      });
+    });
+    if (!(res.items || []).length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td colspan='9' class='small'>Aucune demande</td>";
+      body.appendChild(tr);
+    }
+  } catch (err) {
+    if (statusMsg) statusMsg.textContent = "Erreur de chargement.";
+  }
+}
+
+const membershipRefresh = $("btnMembershipRefresh");
+if (membershipRefresh) {
+  membershipRefresh.addEventListener("click", loadMembershipRequests);
+}
+const membershipStatus = $("membershipStatus");
+if (membershipStatus) {
+  membershipStatus.addEventListener("change", loadMembershipRequests);
 }
 
 // Search
@@ -1826,6 +2000,3 @@ checkAuth();
 </script>
 </body>
 </html>
-
-
-

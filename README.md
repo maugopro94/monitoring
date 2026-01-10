@@ -51,6 +51,18 @@ Ouvrir `http://localhost/monitoring/charge_suivi.html`.
 ## Espace Controle qualite
 Ouvrir `http://localhost/monitoring/controle_qualite.html`.
 
+## Adhesion (membres observateurs)
+Ouvrir `http://localhost/monitoring/adhesion.html`.
+
+Flux adhesion:
+- Demande envoyee vers la table `members` avec `adhesion_status = pending_payment`.
+- Activation par le controleur de qualite du pole (statut `active`) + creation du compte `users` (role `member`).
+- Adhesion a vie, connexion disponible apres activation (via `charge_suivi.html`).
+
+Tarifs:
+- Etudiant: 5 000 XOF
+- Professionnel: 10 000 XOF
+
 Profil "Charge de suivi" (role `charge_suivi`) - privileges principaux:
 - Authentification: inscription + connexion (pole obligatoire a l'inscription).
 - Soumission d'observations (formulaire inspire de `birds`) vers `observation_pending`.
@@ -71,12 +83,20 @@ Profil "Controle qualite par pole" (role `controle_qualite`) - privileges princi
 - Insertion automatique dans `birds` apres validation.
 - Gestion des comptes `charge_suivi` de son pole (creation/desactivation).
 - Suivi des validations et exports filtres par pole.
+- Activation ou rejet des adhesions membres de son pole.
+
+Profil "Membre observateur" (role `member`) - privileges principaux:
+- Acces aux observations du pole.
+- Participation aux activites terrain.
+- Messagerie interne avec l equipe.
+- Rapports et exports filtres.
 
 Roles associes:
 - `charge_suivi`: soumettre + consulter + partager.
 - `controleur`: valider/rejeter les observations en attente.
 - `controle_qualite`: valider/rejeter les observations de son pole + gestion charge_suivi.
 - `admin`: meme droits que controleur + gestion de roles lors inscription.
+- `member`: acces restreint aux observations/rapports/messagerie de son pole.
 
 Flux de validation:
 ```
@@ -95,6 +115,10 @@ Routes:
   - Params: filtres.
 - `filters/zones`: liste des zones.
 - `filters/sites`: liste des sites (param `zone` optionnel).
+- `membership/request`: soumission d'adhesion membre.
+- `membership/list`: liste des demandes (controle_qualite/admin).
+- `membership/approve`: activation d'adhesion (controle_qualite/admin).
+- `membership/reject`: rejet d'adhesion (controle_qualite/admin).
 - `users/list`: liste des utilisateurs (admin/controle_qualite).
 - `users/create`: creation utilisateur (admin/controle_qualite).
 - `users/status`: activer/desactiver un utilisateur (admin/controle_qualite).
@@ -119,6 +143,8 @@ Filtres supportes:
 - `users`: comptes + roles (`charge_suivi`, `controleur`, `controle_qualite`, `admin`) + champ `pole`.
 - `observation_pending`: observations en attente de validation.
 - `messagerie`: messagerie interne (piece jointe integree dans la table).
+- `members`: membres observateurs + adhesion (`adhesion_status`, `adhesion_type`, `adhesion_amount`, `fonction`, `organisation`, `password_hash`, `user_id`).
+- `membership_payments`: traces de paiement (Wave) en attente d'integration.
 
 ## Maintenance / mises a jour futures
 - Ajouter un filtre:

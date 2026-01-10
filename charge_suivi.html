@@ -69,7 +69,7 @@
       <div class="card">
         <h2>Navigation</h2>
         <div class="nav">
-          <button class="tab active" data-tab="submitView">Observations</button>
+          <button class="tab active" data-tab="submitView" id="tabSubmit">Observations</button>
           <button class="tab" data-tab="reviewView" id="tabReview">Statuts</button>
           <button class="tab" data-tab="searchView">Rapports</button>
           <button class="tab" data-tab="chatView">Messagerie</button>
@@ -675,6 +675,14 @@ function getInitials(fullName) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+function roleLabel(role) {
+  if (role === "member") return "Membre observateur";
+  if (role === "controle_qualite") return "Controle qualite";
+  if (role === "controleur") return "Controleur";
+  if (role === "charge_suivi") return "Charge de suivi";
+  return role || "";
+}
+
 function loadProfilePrefs() {
   const defaults = { darkMode: false, push: true, language: "fr", theme: "light" };
   state.prefs = loadLocalJson(PREFS_KEY, defaults);
@@ -845,7 +853,7 @@ function renderUserInfo() {
   if (!state.user) return;
   $("userInfo").textContent = `${state.user.full_name} (${state.user.role})`;
   $("userName").textContent = state.user.full_name || "Utilisateur";
-  $("userRole").textContent = state.user.role || "";
+  $("userRole").textContent = roleLabel(state.user.role);
   $("userAvatar").textContent = getInitials(state.user.full_name || "");
   applyProfileFields();
 }
@@ -864,15 +872,31 @@ async function checkAuth() {
 }
 
 function setupRoleViews() {
+  const isMember = state.user.role === "member";
   const canReview = ["controleur", "controle_qualite", "admin"].includes(state.user.role);
   const reviewTab = $("tabReview");
   if (reviewTab) {
     reviewTab.classList.toggle("hidden", !canReview);
   }
+  const submitTab = $("tabSubmit");
+  if (submitTab) {
+    submitTab.classList.toggle("hidden", isMember);
+  }
+  const submitView = $("submitView");
+  if (submitView) {
+    submitView.classList.toggle("hidden", isMember);
+  }
+  if (isMember && state.tab === "submitView") {
+    setTab("searchView");
+  }
 }
 
 async function initData() {
-  await Promise.all([loadZones(), loadSpeciesOptions(), loadMyPending(), loadUsers()]);
+  const tasks = [loadZones(), loadSpeciesOptions(), loadUsers()];
+  if (state.user.role !== "member") {
+    tasks.push(loadMyPending());
+  }
+  await Promise.all(tasks);
   if (["controleur", "controle_qualite", "admin"].includes(state.user.role)) {
     await loadReviewList();
   }
@@ -1782,6 +1806,4 @@ checkAuth();
 </script>
 </body>
 </html>
-
-
 
