@@ -329,6 +329,10 @@
 .page-landing .speciesScroll{max-height:520px;overflow:auto;padding:2px}
 .page-landing .speciesGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .page-landing .speciesCard{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.08);display:flex;flex-direction:column;min-height:320px}
+.page-landing .speciesCard.clickable{cursor:pointer;transition:transform .15s ease, box-shadow .15s ease}
+.page-landing .speciesCard.clickable:hover{transform:translateY(-2px);box-shadow:0 18px 32px rgba(15,23,42,.14)}
+.page-landing .speciesCard.clickable:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.page-landing .speciesCard.is-loading{opacity:.7;pointer-events:none}
 .page-landing .speciesMedia{position:relative;height:150px;background:linear-gradient(135deg,#e0f2fe,#fef9c3)}
 .page-landing .speciesMedia img{width:100%;height:100%;object-fit:cover;display:block}
 .page-landing .speciesPlaceholder{position:absolute;inset:0;display:grid;place-items:center;font-size:32px;font-weight:700;color:#1e293b}
@@ -347,6 +351,13 @@
 .page-landing .speciesInfo{display:grid;gap:4px;font-size:12px;color:var(--muted)}
 .page-landing .speciesInfo strong{color:#1e293b;font-weight:600}
 .page-landing .speciesEmpty{padding:16px;color:var(--muted);font-size:13px}
+.page-landing .speciesModal{position:fixed;inset:0;display:grid;place-items:center;background:rgba(15,23,42,.35);z-index:999;padding:24px}
+.page-landing .speciesModalCard{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow);width:min(360px,92vw);display:grid;gap:10px}
+.page-landing .speciesModalTitle{margin:0;font-size:18px;font-weight:700}
+.page-landing .speciesModalText{margin:0;font-size:13px;color:var(--muted);line-height:1.4}
+.page-landing .speciesModalActions{display:flex;justify-content:flex-end}
+.page-landing .speciesModalClose{padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);font-weight:600;cursor:pointer}
+.page-landing .speciesModal[hidden]{display:none}
 @media (max-width:720px){
   .page-landing .title{font-size:32px}
   .page-landing .hero{padding:32px}

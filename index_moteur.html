@@ -425,6 +425,24 @@ function collectFilters(){
   };
 }
 
+function normalizeTabKey(value){
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return "";
+  if (key === "stats" || key === "statistiques" || key === "statsview") return "statsView";
+  if (key === "table" || key === "tableau" || key === "tableview") return "tableView";
+  if (key === "map" || key === "carte" || key === "mapview") return "mapView";
+  return "";
+}
+
+function applyInitialParams(){
+  const params = new URLSearchParams(window.location.search);
+  const qParam = params.get("q");
+  if (qParam) $("q").value = qParam;
+  const hashTab = window.location.hash ? window.location.hash.slice(1) : "";
+  const tabParam = params.get("tab") || hashTab;
+  return normalizeTabKey(tabParam);
+}
+
 async function safeFetchJson(url){
   const res = await fetch(url);
   const text = await res.text(); // <- lit le message même en cas d'erreur
@@ -977,6 +995,7 @@ function resetFilters(){
 /** Boot **/
 (async function boot(){
   setNetStatus("ok", NET_LABEL);
+  const initialTab = applyInitialParams();
 
   document.querySelectorAll(".tab").forEach(el => el.addEventListener("click", ()=>setTab(el.dataset.tab)));
   $("btnSearch").addEventListener("click", ()=>runSearch());
@@ -1051,6 +1070,7 @@ function resetFilters(){
   });
 
   await initMap();
+  if (initialTab) setTab(initialTab);
 
   const handleResize = debounce(() => {
     if (map) map.resize();
@@ -1063,6 +1083,4 @@ function resetFilters(){
 </script>
 </body>
 </html>
-
-
 

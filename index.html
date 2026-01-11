@@ -123,6 +123,15 @@
       </div>
     </div>
   </main>
+  <div class="speciesModal" id="speciesModal" role="dialog" aria-modal="true" aria-hidden="true" hidden>
+    <div class="speciesModalCard">
+      <h3 class="speciesModalTitle">Aucune donnee</h3>
+      <p class="speciesModalText" id="speciesModalMessage">Aucune donnee pour cette espece.</p>
+      <div class="speciesModalActions">
+        <button type="button" class="speciesModalClose" id="speciesModalClose">Fermer</button>
+      </div>
+    </div>
+  </div>
   <script>
     document.querySelectorAll(".card.clickable").forEach(card => {
       const href = card.dataset.href;
@@ -281,6 +290,100 @@
       return "";
     }
 
+    const speciesModal = document.getElementById("speciesModal");
+    const speciesModalMessage = document.getElementById("speciesModalMessage");
+    const speciesModalClose = document.getElementById("speciesModalClose");
+
+    function hideSpeciesModal(){
+      if (!speciesModal) return;
+      speciesModal.hidden = true;
+      speciesModal.setAttribute("aria-hidden", "true");
+    }
+
+    function showSpeciesModal(message){
+      if (!speciesModal || !speciesModalMessage) {
+        alert(message);
+        return;
+      }
+      speciesModalMessage.textContent = message;
+      speciesModal.hidden = false;
+      speciesModal.setAttribute("aria-hidden", "false");
+      if (speciesModalClose) speciesModalClose.focus();
+    }
+
+    if (speciesModal) {
+      speciesModal.addEventListener("click", (event) => {
+        if (event.target === speciesModal) hideSpeciesModal();
+      });
+    }
+    if (speciesModalClose) {
+      speciesModalClose.addEventListener("click", hideSpeciesModal);
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && speciesModal && !speciesModal.hidden) {
+        hideSpeciesModal();
+      }
+    });
+
+    function pickSpeciesQuery(item){
+      const wicode = String(item.wicode || "").trim();
+      const codeFr = String(item.code_fr || "").trim();
+      const nomSc = String(item.nom_sc || "").trim();
+      const nomFr = String(item.nom_fr || "").trim();
+      const nomEn = String(item.english || "").trim();
+      const query = wicode || codeFr || nomSc || nomFr || nomEn;
+      const label = nomFr || nomSc || wicode || codeFr || nomEn;
+      return { query, label };
+    }
+
+    function buildStatsCheckUrl(query){
+      const params = new URLSearchParams({ route: "observations/stats" });
+      params.set("q", query);
+      return `api.php?${params.toString()}`;
+    }
+
+    function buildStatsRedirectUrl(query){
+      const params = new URLSearchParams({ tab: "stats" });
+      params.set("q", query);
+      return `index_moteur.html?${params.toString()}`;
+    }
+
+    async function handleSpeciesClick(item, card){
+      if (!item) return;
+      if (card && card.dataset.loading === "true") return;
+      const { query, label } = pickSpeciesQuery(item);
+      if (!query) {
+        showSpeciesModal("Aucune donnee pour cette espece.");
+        return;
+      }
+      if (card) {
+        card.dataset.loading = "true";
+        card.classList.add("is-loading");
+      }
+      try {
+        const res = await fetch(buildStatsCheckUrl(query));
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.error || "Erreur API");
+        }
+        const total = Number(data?.kpis?.observations || 0);
+        if (total > 0) {
+          window.location.href = buildStatsRedirectUrl(query);
+        } else {
+          const name = label ? `pour ${label}` : "pour cette espece";
+          showSpeciesModal(`Aucune donnee ${name}.`);
+        }
+      } catch (err) {
+        console.error(err);
+        showSpeciesModal("Impossible de verifier les donnees pour cette espece.");
+      } finally {
+        if (card) {
+          card.dataset.loading = "false";
+          card.classList.remove("is-loading");
+        }
+      }
+    }
+
     function buildSpeciesCard(item){
       const nomFr = String(item.nom_fr || "").trim();
       const nomSc = String(item.nom_sc || "").trim();
@@ -292,7 +395,9 @@
       const photo = String(item.photo || "").trim();
 
       const card = document.createElement("article");
-      card.className = "speciesCard";
+      card.className = "speciesCard clickable";
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
 
       const media = document.createElement("div");
       media.className = "speciesMedia";
@@ -374,6 +479,14 @@
 
       card.appendChild(media);
       card.appendChild(body);
+      const onClick = () => handleSpeciesClick(item, card);
+      card.addEventListener("click", onClick);
+      card.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      });
       return card;
     }
 
@@ -469,4 +582,3 @@
   </script>
 </body>
 </html>
-
